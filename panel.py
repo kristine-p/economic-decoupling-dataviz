@@ -28,7 +28,6 @@ FILES = {
 
 EXCLUDE_AGGREGATES = {"OECD", "OECDA", "OECDE", "OECDSO", "EU27_2020"}
 
-# Correct display names for encoding-broken country strings in OECD files
 DISPLAY_NAMES = {
     "TUR": "Turkiye",
     "CHN": "China (People's Republic of)",
@@ -38,9 +37,7 @@ DISPLAY_NAMES = {
 }
 
 
-# =============================================================================
-# STEP 1 -- GHG TOTAL EMISSIONS
-# =============================================================================
+
 print("\n[1/6] Loading GHG total emissions...")
 
 ghg = pd.read_csv(
@@ -79,10 +76,6 @@ assert dups == 0, f"GHG has {dups} duplicate country-year pairs after filtering 
 print(f"    {len(ghg):,} rows | {ghg['iso3'].nunique()} countries | "
       f"{ghg['year'].min()}-{ghg['year'].max()}")
 
-
-# =============================================================================
-# STEP 2 -- GHG PER CAPITA (tooltip layer for View 1, not used in Tapio calc)
-# =============================================================================
 print("[2/6] Loading GHG per capita (tooltip layer)...")
 
 ghg_pc = pd.read_csv(
@@ -102,9 +95,6 @@ ghg_pc = ghg_pc.dropna(subset=["ghg_per_capita_kg_co2e"])
 print(f"    {len(ghg_pc):,} rows | {ghg_pc['iso3'].nunique()} countries")
 
 
-# =============================================================================
-# STEP 3 -- GDP PER CAPITA PPP (World Bank)
-# =============================================================================
 print("[3/6] Loading GDP per capita PPP (World Bank)...")
 
 gdp_raw = pd.read_csv(os.path.join(RAW, FILES["gdp"]), skiprows=4, encoding="utf-8-sig")
@@ -122,9 +112,6 @@ gdp = gdp.dropna(subset=["gdp_pc_ppp_usd"])
 print(f"    {len(gdp):,} rows | {gdp['iso3'].nunique()} entities")
 
 
-# =============================================================================
-# STEP 4 -- PM2.5 MEAN CONCENTRATION (ug/m3)
-# =============================================================================
 print("[4/6] Loading PM2.5 mean concentration...")
 
 # The PM2.5 file has 11 rows per country-year:
@@ -164,9 +151,6 @@ print(f"    {len(pm25):,} rows | {pm25['iso3'].nunique()} countries | "
 print(f"    Note: 1990 and 1995 only before 2001; no data 2021-2023 (show 2020 in UI)")
 
 
-# =============================================================================
-# STEP 5 -- MERGE PANEL
-# =============================================================================
 print("[5/6] Building merged panel...")
 
 panel = pd.merge(
@@ -202,9 +186,6 @@ print(f"    PM2.5 coverage: {panel['pm25_ugm3'].notna().sum():,} rows "
       f"({panel['pm25_ugm3'].notna().mean()*100:.1f}%)")
 
 
-# =============================================================================
-# STEP 6 -- TAPIO ELASTICITY INDEX
-# =============================================================================
 print("[6/6] Computing Tapio Elasticity Index...")
 
 panel = panel.sort_values(["iso3", "year"]).reset_index(drop=True)
@@ -214,7 +195,10 @@ panel["ghg_pct_change"] = panel.groupby("iso3")["ghg_total_t_co2e"].pct_change()
 panel["gdp_pct_change"] = panel.groupby("iso3")["gdp_pc_ppp_usd"].pct_change() * 100
 
 # Annual Tapio E = delta%GHG / delta%GDP
-# Undefined only when: (a) first year of series -> NaN, or (b) near-zero GDP growth
+# Undefined only when:
+#   first year of series == NaN
+#   or 
+#   near-zero GDP growth
 panel["tapio_E"] = np.where(
     panel["gdp_pct_change"].abs() < 0.01,
     np.nan,
@@ -256,9 +240,7 @@ print(f"    Breakdown of {undef} undefined: {first_yr} first-year NaN + "
       f"{undef - first_yr} genuine near-zero GDP growth")
 
 
-# =============================================================================
-# STEP 7 -- CLIMATE PROJECTIONS (chunked read for 1.5GB file)
-# =============================================================================
+
 print("[7/7] Loading climate projections...")
 
 CLIM_PATH = os.path.join(RAW, FILES["climate"])
@@ -275,7 +257,6 @@ SCENARIO_LABELS = {
     "PROJ_SSP585": "SSP5-8.5 (very high emissions)",
 }
 
-# Mapping: current Tapio class -> most plausible SSP future (used in View 3)
 TAPIO_TO_SSP = {
     "absolute_decoupling":            "PROJ_SSP126",
     "relative_decoupling":            "PROJ_SSP245",
@@ -303,7 +284,6 @@ else:
     ):
         rows_read += len(chunk)
 
-        # Keep country-level rows only (drops all sub-national/regional rows)
         chunk = chunk[chunk["TERRITORIAL_LEVEL"] == "CTRY"]
         chunk = chunk[
             chunk["MEASURE"].isin(MEASURES_KEEP) &
@@ -330,7 +310,6 @@ else:
         lambda r: DISPLAY_NAMES.get(r["iso3"], r["country"]), axis=1
     )
 
-    # Pivot: one row per (country, year, scenario), one column per measure
     climate_wide = climate.pivot_table(
         index=["iso3", "country", "year", "scenario"],
         columns="measure",
@@ -345,7 +324,6 @@ else:
     })
     climate_wide["scenario_label"] = climate_wide["scenario"].map(SCENARIO_LABELS)
 
-    # Link each country's latest Tapio class to its natural SSP scenario
     tapio_latest = (
         panel[panel["year"] == panel["year"].max()]
         [["iso3", "tapio_class"]]
@@ -365,9 +343,6 @@ else:
     print(f"    Saved {clim_path}")
 
 
-# =============================================================================
-# SAVE PANEL
-# =============================================================================
 panel_path = os.path.join(OUT, "merged_panel.csv")
 panel.to_csv(panel_path, index=False)
 
