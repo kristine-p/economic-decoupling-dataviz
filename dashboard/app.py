@@ -42,9 +42,20 @@ historical_df, projections_df = load_data()
 # ─────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────
-st.title("Breaking the Link")
-st.markdown("### Visualizing the Decoupling of Economic Expansion and Environmental Impact")
-st.caption("Can a nation expand its economy while simultaneously shrinking its environmental footprint?")
+
+st.markdown("""
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; border-bottom: 1px solid #e0ddd8; padding-bottom: 0.8rem;">
+        <h2 style="margin:0; font-size:1.8rem; color:#2C2C2C; flex-shrink:0;">Breaking the Link</h2>
+        <div style="text-align:right; padding-left:2rem;">
+            <p style="margin:0 0 0.2rem 0; font-weight:500; color:#555; font-size:0.9rem;">
+                Visualizing the Decoupling of Economic Expansion and Environmental Impact
+            </p>
+            <p style="margin:0; color:#999; font-size:0.82rem;">
+                Can a nation expand its economy while simultaneously shrinking its environmental footprint?
+            </p>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
 # ─────────────────────────────────────────
 # TABS

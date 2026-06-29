@@ -191,17 +191,19 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class") -> go.Fig
         ))
 
     fig.update_geos(
-        projection_type="natural earth",
+        projection_type="miller",
         showcoastlines=True, coastlinecolor="rgba(0,0,0,0.15)",
         showland=True,       landcolor="#f0ede8",
         showocean=True,      oceancolor="#ddeef5",
         showframe=False,
-        bgcolor="rgba(0,0,0,0)"
+        bgcolor="rgba(0,0,0,0)",
+        lataxis_range=[-45, 85],
+        lonaxis_range=[-180, 180],
     )
 
     fig.update_layout(
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        height=520,
+        height=550,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         geo=dict(bgcolor="rgba(0,0,0,0)"),
@@ -215,27 +217,36 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class") -> go.Fig
 # ─────────────────────────────────────────
 
 def render(historical_df: pd.DataFrame):
+
+    min_year = int(historical_df["year"].min())
+    max_year = int(historical_df["year"].max())
+
     st.markdown(
         "**Does a country's economic growth rely on emissions?** "
         "Green means GDP is growing while emissions shrink. "
         "Muted tones indicate a contracting economy — interpret with caution."
     )
 
-    min_year = int(historical_df["year"].min())
-    max_year = int(historical_df["year"].max())
+    mode_col, caption_col = st.columns([1, 2])
+    with mode_col:
+        smoothing = st.radio(
+            "View mode:",
+            options=["Annual", "5-year rolling average"],
+            horizontal=True,
+            key="smoothing_v1",
+        )
+    with caption_col:
+        if smoothing == "5-year rolling average":
+            caption = "📊 Smooths short-term shocks like COVID-2020, showing each country's underlying long-term trend."
+        else:
+            caption = "📊 Raw year-by-year classification — useful for spotting specific events but more sensitive to short-term shocks."
+        st.markdown(
+            f"<p style='font-size:0.8rem; color:#999; margin-top:1.8rem;'>{caption}</p>",
+            unsafe_allow_html=True
+        )
 
-    smoothing = st.radio(
-    "View mode:",
-    options=["Annual", "5-year rolling average"],
-    horizontal=True,
-    key="smoothing_v1",
-    )
+
     tapio_col = "tapio_class" if smoothing == "Annual" else "tapio_class_5yr"
-    if smoothing == "5-year rolling average":
-        st.caption("📊 The 5-year average smooths out short-term shocks like COVID-2020, showing each country's underlying long-term trend rather than year-to-year noise.")
-    else:
-        st.caption("📊 Annual view shows the raw year-by-year classification — useful for spotting specific events but more sensitive to short-term shocks.")
-    
     e_col = "tapio_E" if tapio_col == "tapio_class" else "tapio_E_5yr"
     e_label = "Tapio E (annual)" if tapio_col == "tapio_class" else "Tapio E (5yr avg)"
 
