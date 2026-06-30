@@ -132,9 +132,12 @@ def build_legend_html() -> str:
 # MAP
 # ─────────────────────────────────────────
 
-def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class") -> go.Figure:
+def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class", fogged: bool = False) -> go.Figure:
     e_col = "tapio_E" if tapio_col == "tapio_class" else "tapio_E_5yr"
     fig = go.Figure()
+
+    # If toggled ON, drop choropleth opacity to 30% to create the "fog" effect
+    base_opacity = 0.3 if fogged else 1.0
 
     for class_key in CATEGORY_ORDER:
         subset = year_data[year_data[tapio_col] == class_key].copy()
@@ -213,14 +216,10 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class") -> go.Fig
 
 
 # ─────────────────────────────────────────
-# MAIN VIEW RENDERER
+# RENDER CONTROLS & RETURN COMPONENTS
 # ─────────────────────────────────────────
-
-def render(historical_df: pd.DataFrame):
-
-    min_year = int(historical_df["year"].min())
-    max_year = int(historical_df["year"].max())
-
+def build_view(historical_df: pd.DataFrame, show_pm25: bool):
+    """Renders UI controls and builds the base figure, passing it back to app.py"""
     st.markdown(
         "**Does a country's economic growth rely on emissions?** "
         "Green means GDP is growing while emissions shrink. "
@@ -240,53 +239,63 @@ def render(historical_df: pd.DataFrame):
             caption = "📊 Smooths short-term shocks like COVID-2020, showing each country's underlying long-term trend."
         else:
             caption = "📊 Raw year-by-year classification — useful for spotting specific events but more sensitive to short-term shocks."
-        st.markdown(
-            f"<p style='font-size:0.8rem; color:#999; margin-top:1.8rem;'>{caption}</p>",
-            unsafe_allow_html=True
-        )
-
+        st.markdown(f"<p style='font-size:0.8rem; color:#999; margin-top:1.8rem;'>{caption}</p>", unsafe_allow_html=True)
 
     tapio_col = "tapio_class" if smoothing == "Annual" else "tapio_class_5yr"
+    
+    # Dynamically restrict slider range if the PM2.5 layer is toggled ON
+    if show_pm25:
+        min_year = max(2000, int(historical_df["year"].min()))
+        max_year = min(2020, int(historical_df["year"].max()))
+        st.caption("⏳ *Timeline restricted to 2000-2020 due to Air Quality data availability.*")
+    else:
+        min_year = int(historical_df["year"].min())
+        max_year = int(historical_df["year"].max())
+
+    st.markdown("""
+        <style>
+        [data-testid="stSlider"] .st-emotion-cache-1xp7nia { color: #2D5A27; }
+        [data-testid="stSlider"] [role="slider"] { background-color: #2D5A27; }
+        [data-testid="stSlider"] .st-bq { background-color: #2D5A27; }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    selected_year = st.slider(
+        f"Timeline: {min_year} – {max_year}",
+        min_value=min_year,
+        max_value=max_year,
+        value=max_year,
+        step=1,
+        key="slider_v1",
+        format="%d",
+    )
+    
+    year_data = historical_df[historical_df["year"] == selected_year].copy()
+    
+    # Pass 'fogged' parameter to map builder
+    fig = build_map(year_data, tapio_col, fogged=show_pm25)
+    
+    return fig, year_data, tapio_col, selected_year
+
+
+# ─────────────────────────────────────────
+# HELPER RENDERERS FOR APP.PY LAYOUT
+# ─────────────────────────────────────────
+def render_legend():
+    """Renders the HTML legend so app.py can place it in the correct column."""
+    components.html(build_legend_html(), height=620, scrolling=False)
+
+
+def render_data_table(year_data: pd.DataFrame, tapio_col: str, selected_year: int):
+    """Renders the raw data table at the bottom of the page."""
     e_col = "tapio_E" if tapio_col == "tapio_class" else "tapio_E_5yr"
     e_label = "Tapio E (annual)" if tapio_col == "tapio_class" else "Tapio E (5yr avg)"
-
-    map_col, legend_col = st.columns([3, 1])
-
-    with map_col:
-        st.markdown("""
-            <style>
-            [data-testid="stSlider"] .st-emotion-cache-1xp7nia {
-                color: #2D5A27;
-            }
-            [data-testid="stSlider"] [role="slider"] {
-                background-color: #2D5A27;
-            }
-            [data-testid="stSlider"] .st-bq {
-                background-color: #2D5A27;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-        selected_year = st.slider(
-            f"Timeline: {min_year} – {max_year}",
-            min_value=min_year,
-            max_value=max_year,
-            value=max_year,
-            step=1,
-            key="slider_v1",
-            format="%d",
-        )
-        year_data = historical_df[historical_df["year"] == selected_year].copy()
-        fig = build_map(year_data, tapio_col)
-        st.plotly_chart(fig, width='stretch')
-
-    with legend_col:
-        components.html(build_legend_html(), height=620, scrolling=False)
-
+    
     with st.expander(f"📊 View Raw Data for {selected_year}"):
         display_df = year_data[["country", tapio_col, "gdp_pct_change", "ghg_pct_change", e_col]].copy()
         display_df.columns = ["Country", "Decoupling Status", "GDP % Change", "GHG % Change", e_label]
-        display_df["Decoupling Status"] = display_df["Decoupling Status"].str.replace("_", " ").str.title()
+        display_df["Decoupling Status"] = display_df["Decoupling Status"].astype(str).str.replace("_", " ").str.title()
         st.dataframe(
             display_df.set_index("Country").dropna(how="all"),
-            width='stretch'
+            width="stretch"
         )

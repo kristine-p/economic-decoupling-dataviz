@@ -22,27 +22,21 @@ def load_data():
     base_dir = os.path.dirname(os.path.abspath(__file__))
     historical_path = os.path.join(base_dir, "..", "data", "processed", "merged_panel.csv")
     projections_path = os.path.join(base_dir, "..", "data", "processed", "climate_projections.csv")
+    
+    # Load the new regional dataset
+    regions_path = os.path.join(base_dir, "..", "data", "processed", "pm25_regions.csv")
 
     historical_df = pd.read_csv(historical_path)
     projections_df = pd.read_csv(projections_path)
+    regions_df = pd.read_csv(regions_path)
+    
+    return historical_df, projections_df, regions_df
 
-    def categorize_pm25(val):
-        if pd.isna(val):   return 'No Data'
-        elif val <= 5.0:   return 'Good (<=5 µg/m³)'
-        elif val <= 10.0:  return 'Fair (5.1-10 µg/m³)'
-        elif val <= 15.0:  return 'Moderate (10.1-15 µg/m³)'
-        elif val <= 25.0:  return 'Poor (15.1-25 µg/m³)'
-        else:              return 'Very Poor (>25 µg/m³)'
-
-    historical_df["pm25_class"] = historical_df["pm25_ugm3"].apply(categorize_pm25)
-    return historical_df, projections_df
-
-historical_df, projections_df = load_data()
+historical_df, projections_df, regions_df = load_data()
 
 # ─────────────────────────────────────────
 # HEADER
 # ─────────────────────────────────────────
-
 st.markdown("""
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; border-bottom: 1px solid #e0ddd8; padding-bottom: 0.8rem;">
         <h2 style="margin:0; font-size:1.8rem; color:#2C2C2C; flex-shrink:0;">Breaking the Link</h2>
@@ -57,13 +51,33 @@ st.markdown("""
     </div>
 """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────
-# TABS
-# ─────────────────────────────────────────
-tab1, tab2 = st.tabs(["🌍 View 1: Global Decoupling", "🌬️ View 2: Human Breath (PM2.5)"])
+# Toggle to trigger View 2 logic
+show_pm25 = st.toggle("🌬️ Show Air Quality Layer (PM2.5)", value=False)
 
-with tab1:
-    view1.render(historical_df)
+# ─────────────────────────────────────────
+# BUILD & COMPILE FIGURE
+# ─────────────────────────────────────────
+# 1. Ask View 1 to build the controls and base map (no rendering yet)
+fig, year_data, tapio_col, selected_year = view1.build_view(historical_df, show_pm25=show_pm25)
 
-with tab2:
-    view2.render(historical_df)
+# 2. Ask View 2 to modify the figure if toggled ON (Using Regional Data)
+if show_pm25:
+    # Filter the regional data down to the selected year
+    regional_year_data = regions_df[regions_df["year"] == selected_year].copy()
+    fig = view2.add_pm25_overlay(fig, regional_year_data)
+
+# ─────────────────────────────────────────
+# LAYOUT & RENDER
+# ─────────────────────────────────────────
+map_col, legend_col = st.columns([3, 1])
+
+with map_col:
+    # Use width="stretch" to resolve recent Streamlit deprecation warnings
+    st.plotly_chart(fig, width="stretch")
+
+with legend_col:
+    # Ask View 1 to output the HTML legend
+    view1.render_legend()
+
+# Ask View 1 to output the raw data table below the map
+view1.render_data_table(year_data, tapio_col, selected_year)
