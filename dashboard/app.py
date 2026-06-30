@@ -23,8 +23,8 @@ def load_data():
     historical_path = os.path.join(base_dir, "..", "data", "processed", "merged_panel.csv")
     projections_path = os.path.join(base_dir, "..", "data", "processed", "climate_projections.csv")
     
-    # Load the new regional dataset
-    regions_path = os.path.join(base_dir, "..", "data", "processed", "pm25_regions.csv")
+    # Load the newly GEOCODED regional dataset!
+    regions_path = os.path.join(base_dir, "..", "data", "processed", "pm25_regions_geocoded.csv")
 
     historical_df = pd.read_csv(historical_path)
     projections_df = pd.read_csv(projections_path)

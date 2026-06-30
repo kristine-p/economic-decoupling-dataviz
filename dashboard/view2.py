@@ -2,10 +2,10 @@ import pandas as pd
 import plotly.graph_objects as go
 
 def add_pm25_overlay(fig: go.Figure, regional_year_data: pd.DataFrame) -> go.Figure:
-    """Takes View 1's figure and overlays regional PM2.5 bubbles on top of it."""
+    """Takes View 1's figure and overlays regional PM2.5 bubbles using lat/lon coordinates."""
     
-    # Filter out missing data
-    pm25_data = regional_year_data.dropna(subset=['pm25_ugm3'])
+    # Filter out missing data and ensure coordinates exist
+    pm25_data = regional_year_data.dropna(subset=['pm25_ugm3', 'lat', 'lon'])
     
     if pm25_data.empty:
         return fig
@@ -21,7 +21,9 @@ def add_pm25_overlay(fig: go.Figure, regional_year_data: pd.DataFrame) -> go.Fig
         
     fig.add_trace(
         go.Scattergeo(
-            locations=pm25_data['iso3'],
+            # Using precise Lat/Lon instead of country ISO codes!
+            lat=pm25_data['lat'],
+            lon=pm25_data['lon'],
             marker=dict(
                 size=pm25_data['pm25_ugm3'],
                 sizemode='area',
@@ -40,7 +42,7 @@ def add_pm25_overlay(fig: go.Figure, regional_year_data: pd.DataFrame) -> go.Fig
                     y=0.45
                 ),
                 line=dict(color='rgba(255, 255, 255, 0.7)', width=0.5),
-                opacity=0.65 # Make slightly transparent so overlapping regional bubbles are visible
+                opacity=0.85 # Increased opacity since they are nicely spread out now
             ),
             name='Regional PM2.5',
             # Include region name in the hover text
