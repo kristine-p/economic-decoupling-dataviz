@@ -89,14 +89,14 @@ def build_legend_html() -> str:
             color = TAPIO_COLORS[key]
             light, dark = TAPIO_COLORSCALES[key]
             rows.append(f"""
-                <div style="display:flex; align-items:flex-start; gap:10px; margin-bottom:10px;">
-                    <div style="min-width:18px; flex-shrink:0; margin-top:3px;">
-                        <div style="width:18px; height:40px; border-radius:3px;
+                <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:6px;">
+                    <div style="min-width:11px; flex-shrink:0; margin-top:2px;">
+                        <div style="width:11px; height:26px; border-radius:2px;
                                     background:linear-gradient(to bottom, {dark}, {light});"></div>
                     </div>
                     <div>
-                        <div style="font-weight:600; font-size:13px; color:#1a1a1a;">{name}</div>
-                        <div style="font-size:11px; color:#555; margin-top:1px;">{desc}</div>
+                        <div style="font-weight:600; font-size:11px; color:#1a1a1a;">{name}</div>
+                        <div style="font-size:9px; color:#555; margin-top:1px; line-height:1.3;">{desc}</div>
                     </div>
                 </div>
             """)
@@ -116,9 +116,9 @@ def build_legend_html() -> str:
     return f"""
         <html>
         <body style="margin:0; padding:0; background:transparent; font-family:sans-serif;">
-        <div style="border:1px solid #d0d0d0; border-radius:8px; padding:16px 18px; background:#fafafa;">
-            <div style="font-size:12px; font-weight:700; letter-spacing:0.06em;
-                        text-transform:uppercase; color:#333; margin-bottom:14px;">
+        <div style="border:1px solid #d0d0d0; border-radius:8px; padding:12px 14px; background:rgba(255,255,255,0.92); height: calc(100vh - 90px); max-height: 432px; overflow-y: auto; box-sizing: border-box;">
+            <div style="font-size:11px; font-weight:700; letter-spacing:0.06em;
+                        text-transform:uppercase; color:#333; margin-bottom:11px;">
                 DECOUPLING STATUS
             </div>
             {divider.join(sections)}
@@ -202,13 +202,13 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class", fogged: b
         showocean=True,      oceancolor="#ddeef5",
         showframe=False,
         bgcolor="rgba(0,0,0,0)",
-        lataxis_range=[-45, 85],
+        lataxis_range=[-58, 85],
         lonaxis_range=[-180, 180],
     )
 
     fig.update_layout(
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        height=550,
+        height=MAP_HEIGHT,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         geo=dict(bgcolor="rgba(0,0,0,0)"),
@@ -221,71 +221,137 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class", fogged: b
 # RENDER CONTROLS & RETURN COMPONENTS
 # ─────────────────────────────────────────
 def build_view(historical_df: pd.DataFrame, show_pm25: bool):
-    """Renders UI controls and builds the base figure, passing it back to app.py"""
-    st.markdown(
-        "**Does a country's economic growth rely on emissions?** "
-        "Green means GDP is growing while emissions shrink. "
-        "Muted tones indicate a contracting economy — interpret with caution."
-    )
+    """Builds the base figure and returns it along with state; UI controls are rendered separately via render_floating_controls()."""
 
-    mode_col, caption_col = st.columns([1, 2])
-    with mode_col:
-        smoothing = st.radio(
-            "View mode:",
-            options=["Annual", "5-year rolling average"],
-            horizontal=True,
-            key="smoothing_v1",
-        )
-    with caption_col:
-        if smoothing == "5-year rolling average":
-            caption = "📊 Smooths short-term shocks like COVID-2020, showing each country's underlying long-term trend."
-        else:
-            caption = "📊 Raw year-by-year classification — useful for spotting specific events but more sensitive to short-term shocks."
-        st.markdown(f"<p style='font-size:0.8rem; color:#999; margin-top:1.8rem;'>{caption}</p>", unsafe_allow_html=True)
-
+    smoothing = st.session_state.get("smoothing_v1", "Annual")
     tapio_col = "tapio_class" if smoothing == "Annual" else "tapio_class_5yr"
-    
-    # Dynamically restrict slider range if the PM2.5 layer is toggled ON
+
     if show_pm25:
         min_year = max(2000, int(historical_df["year"].min()))
         max_year = min(2020, int(historical_df["year"].max()))
-        st.caption("⏳ *Timeline restricted to 2000-2020 due to Air Quality data availability.*")
     else:
         min_year = int(historical_df["year"].min())
         max_year = int(historical_df["year"].max())
 
-    st.markdown("""
-        <style>
-        [data-testid="stSlider"] .st-emotion-cache-1xp7nia { color: #2D5A27; }
-        [data-testid="stSlider"] [role="slider"] { background-color: #2D5A27; }
-        [data-testid="stSlider"] .st-bq { background-color: #2D5A27; }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    selected_year = st.slider(
-        f"Timeline: {min_year} – {max_year}",
-        min_value=min_year,
-        max_value=max_year,
-        value=max_year,
-        step=1,
-        key="slider_v1",
-        format="%d",
-    )
-    
+    selected_year = st.session_state.get("slider_v1", max_year)
+    selected_year = min(max(selected_year, min_year), max_year)
+
     year_data = historical_df[historical_df["year"] == selected_year].copy()
-    
+
     # Pass 'fogged' parameter to map builder
     fig = build_map(year_data, tapio_col, fogged=show_pm25)
-    
-    return fig, year_data, tapio_col, selected_year
+
+    return fig, year_data, tapio_col, selected_year, min_year, max_year
 
 
-# ─────────────────────────────────────────
-# HELPER RENDERERS FOR APP.PY LAYOUT
-# ─────────────────────────────────────────
+MAP_HEIGHT = 460
+
+
+def render_floating_controls(min_year: int, max_year: int, show_pm25: bool) -> bool:
+    """Renders the toggle/view-mode panel (top-left) and timeline (bottom-center),
+    anchored via inset positioning against the .v1-map-frame wrapper so it stays
+    correct regardless of map height."""
+
+    with st.container(key="v1_controls_panel"):
+        toggle_col1, toggle_col2 = st.columns([3, 1])
+        with toggle_col1:
+            st.markdown("<p style='font-size:13px; margin:6px 0 0;'>Air Quality</p>", unsafe_allow_html=True)
+        with toggle_col2:
+            new_show_pm25 = st.toggle("Air Quality", key="pm25_toggle", label_visibility="collapsed")
+        st.markdown("<p style='font-size:11px; font-weight:600; margin:10px 0 4px;'>View mode</p>", unsafe_allow_html=True)
+        st.radio(
+            "View mode:",
+            options=["Annual", "5-year rolling average"],
+            key="smoothing_v1",
+            label_visibility="collapsed",
+        )
+        if new_show_pm25:
+            st.markdown(
+                "<p style='font-size:0.7rem; color:#999; margin-top:6px;'>⏳ Timeline restricted to 2000–2020 (Air Quality data)</p>",
+                unsafe_allow_html=True
+            )
+
+    with st.container(key="v1_timeline_panel"):
+        st.slider(
+            f"Timeline: {min_year} – {max_year}",
+            min_value=min_year,
+            max_value=max_year,
+            value=min(st.session_state.get("slider_v1", max_year), max_year),
+            step=1,
+            key="slider_v1",
+            format="%d",
+            label_visibility="visible",
+        )
+
+    return new_show_pm25
+
+
 def render_legend():
-    """Renders the HTML legend so app.py can place it in the correct column."""
-    components.html(build_legend_html(), height=620, scrolling=False)
+    """Renders the HTML legend, anchored bottom-right via inset positioning."""
+    with st.container(key="v1_legend_panel"):
+        components.html(build_legend_html(), height=432, scrolling=False)
+
+
+def render_map_frame_css():
+    """Single CSS block defining the .v1-map-frame anchor and all floating panel
+    positions as inset offsets. Call this once before rendering the frame contents."""
+    st.markdown(f"""
+        <style>
+        .st-key-v1_map_frame {{
+            position: relative;
+            height: {MAP_HEIGHT}px;
+        }}
+        .st-key-v1_map_frame > div {{
+            padding: 0 !important;
+            margin: 0 !important;
+            gap: 0 !important;
+        }}
+        .st-key-v1_controls_panel {{
+            position: absolute;
+            top: 14px;
+            left: 14px;
+            z-index: 10;
+            width: 180px;
+            max-height: 70%;
+            overflow-y: auto;
+            background: rgba(255,255,255,0.92);
+            border: 1px solid #d0d0d0;
+            border-radius: 10px;
+            padding: 10px 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }}
+        .st-key-v1_timeline_panel {{
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            width: 50%;
+            min-width: 280px;
+            background: #fff;
+            border: 1px solid #d0d0d0;
+            border-radius: 10px;
+            padding: 8px 18px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }}
+        .st-key-v1_legend_panel {{
+            position: absolute;
+            top: 14px;
+            bottom: 14px;
+            right: 14px;
+            z-index: 10;
+            width: 220px;
+            max-height: calc(100% - 28px);
+            overflow: hidden;
+        }}
+        .st-key-v1_legend_panel iframe {{
+            border-radius: 10px;
+        }}
+        [data-testid="stSlider"] .st-emotion-cache-1xp7nia {{ color: #2D5A27; }}
+        [data-testid="stSlider"] [role="slider"] {{ background-color: #2D5A27; }}
+        [data-testid="stSlider"] .st-bq {{ background-color: #2D5A27; }}
+        </style>
+    """, unsafe_allow_html=True)
 
 
 def render_data_table(year_data: pd.DataFrame, tapio_col: str, selected_year: int):

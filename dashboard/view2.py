@@ -37,9 +37,9 @@ def add_pm25_overlay(fig: go.Figure, regional_year_data: pd.DataFrame) -> go.Fig
                 colorbar=dict(
                     title="PM2.5<br>(µg/m³)",
                     thickness=12,
-                    len=0.45,
+                    len=0.3,
                     x=0.02, # Place colorbar neatly inside the map box
-                    y=0.45
+                    y=0.18
                 ),
                 line=dict(color='rgba(255, 255, 255, 0.7)', width=0.5),
                 opacity=0.85 # Increased opacity since they are nicely spread out now
