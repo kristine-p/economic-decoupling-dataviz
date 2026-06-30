@@ -144,10 +144,10 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class", fogged: b
         if subset.empty:
             continue
 
-        label = next(
-            (name for items in LEGEND_ITEMS.values()
-             for k, name, _ in items if k == class_key),
-            class_key
+        label, description = next(
+            ((name, desc) for items in LEGEND_ITEMS.values()
+             for k, name, desc in items if k == class_key),
+            (class_key, "")
         )
 
         # Normalize E values to 0→1 within clamped range
@@ -178,6 +178,7 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class", fogged: b
             hovertemplate=(
                 "<b>%{customdata[0]}</b><br>"
                 "Status: %{customdata[1]}<br>"
+                "<span style='font-size:11px; color:#666;'>%{customdata[5]}</span><br>"
                 "GDP change: %{customdata[2]}%<br>"
                 "GHG change: %{customdata[3]}%<br>"
                 f"{'Tapio E (5yr avg)' if tapio_col == 'tapio_class_5yr' else 'Tapio E (annual)'}: %{{customdata[4]}}<br>"
@@ -188,7 +189,8 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class", fogged: b
                 gdp_pct_change=subset["gdp_pct_change"].round(2),
                 ghg_pct_change=subset["ghg_pct_change"].round(2),
                 e_val=subset[e_col].round(3),
-            )[["country", "tapio_class_label", "gdp_pct_change", "ghg_pct_change", "e_val"]].values,
+                description=description,
+            )[["country", "tapio_class_label", "gdp_pct_change", "ghg_pct_change", "e_val", "description"]].values,
             marker_line_color="rgba(255,255,255,0.4)",
             marker_line_width=0.5,
         ))
