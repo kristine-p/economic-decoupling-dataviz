@@ -14,9 +14,9 @@ TAPIO_COLORS = {
     "expansive_coupling":            "#E8A87C",
     "expansive_negative_decoupling": "#C4623A",
     # GDP Contracting — muted
-    "recessive_decoupling":          "#8FAF8F",
-    "recessive_coupling":            "#C4B49A",
-    "strong_negative_decoupling":    "#A07060",
+    "recessive_decoupling":          "#A8C5A0",  # matches relative_decoupling
+    "recessive_coupling":            "#E8A87C",  # matches expansive_coupling
+    "strong_negative_decoupling":    "#C4623A",  # matches expansive_negative_decoupling
     # No data
     "undefined":                     "#D9D9D9",
 }
@@ -29,9 +29,9 @@ TAPIO_COLORSCALES = {
     "relative_decoupling":           ["#D4EAD0", "#6B9E65"],  # light→dark sage
     "expansive_coupling":            ["#F5CBA7", "#C47B30"],  # light→dark orange
     "expansive_negative_decoupling": ["#E8A07A", "#7A2010"],  # light→dark terracotta
-    "recessive_decoupling":          ["#C5D9C5", "#4A7A4A"],  # light→dark muted green
-    "recessive_coupling":            ["#DDD0C0", "#8A7055"],  # light→dark muted beige
-    "strong_negative_decoupling":    ["#C4A090", "#5A2A1A"],  # light→dark muted brown
+    "recessive_decoupling":          ["#CFE3CB", "#6B9E65"],  # own range, sage family (visually paired with relative_decoupling)
+    "recessive_coupling":            ["#F0C295", "#C47B30"],  # own range, orange family (visually paired with expansive_coupling)
+    "strong_negative_decoupling":    ["#E29B76", "#7A2010"],  # own range, terracotta family (visually paired with expansive_negative_decoupling)
     "undefined":                     ["#D9D9D9", "#D9D9D9"],
 }
 
