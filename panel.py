@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Preprocess raw OECD and World Bank data into a single panel for the decoupling dataviz
-It's the second version so note that it's still WiP and feedbacks are encouraged.
+v4 -- adds region-level PM2.5 output and 5-year rolling PM2.5 averages.
 """
 
 import os
@@ -19,11 +19,11 @@ OUT = args.out_dir
 os.makedirs(OUT, exist_ok=True)
 
 FILES = {
-    "ghg_all":  "GHG_all.csv",         
-    "ghg_pc":   "GHGpercapita.csv",    
-    "gdp":      "GDP_PPPadjusted.csv", 
-    "pm25":     "PM2.5.csv",           
-    "climate":  "CLIM_PROJ_all.csv",   
+    "ghg_all":  "GHG_all.csv",
+    "ghg_pc":   "GHGpercapita.csv",
+    "gdp":      "GDP_PPPadjusted.csv",
+    "pm25":     "PM2.5.csv",
+    "climate":  "CLIM_PROJ_all.csv",
 }
 
 EXCLUDE_AGGREGATES = {"OECD", "OECDA", "OECDE", "OECDSO", "EU27_2020"}
@@ -38,7 +38,7 @@ DISPLAY_NAMES = {
 
 
 
-print("\n[1/6] Loading GHG total emissions...")
+print("\n[1/7] Loading GHG total emissions...")
 
 ghg = pd.read_csv(
     os.path.join(RAW, FILES["ghg_all"]),
@@ -76,7 +76,7 @@ assert dups == 0, f"GHG has {dups} duplicate country-year pairs after filtering 
 print(f"    {len(ghg):,} rows | {ghg['iso3'].nunique()} countries | "
       f"{ghg['year'].min()}-{ghg['year'].max()}")
 
-print("[2/6] Loading GHG per capita (tooltip layer)...")
+print("[2/7] Loading GHG per capita (tooltip layer)...")
 
 ghg_pc = pd.read_csv(
     os.path.join(RAW, FILES["ghg_pc"]),
@@ -95,7 +95,7 @@ ghg_pc = ghg_pc.dropna(subset=["ghg_per_capita_kg_co2e"])
 print(f"    {len(ghg_pc):,} rows | {ghg_pc['iso3'].nunique()} countries")
 
 
-print("[3/6] Loading GDP per capita PPP (World Bank)...")
+print("[3/7] Loading GDP per capita PPP (World Bank)...")
 
 gdp_raw = pd.read_csv(os.path.join(RAW, FILES["gdp"]), skiprows=4, encoding="utf-8-sig")
 
@@ -112,29 +112,37 @@ gdp = gdp.dropna(subset=["gdp_pc_ppp_usd"])
 print(f"    {len(gdp):,} rows | {gdp['iso3'].nunique()} entities")
 
 
-print("[4/6] Loading PM2.5 mean concentration...")
+print("[4/7] Loading PM2.5 mean concentration (country + region level)...")
 
-# The PM2.5 file has 11 rows per country-year:
+# The PM2.5 file has 11 rows per country/region-year:
 #   MEASURE=MEAN_POP + EXPOSURE_LEVEL=_Z  ->  mean concentration in ug/m3  (USE THIS)
 #   MEASURE=POP_EXP_POL at 10 WHO threshold bands                           (IGNORE)
 #
 # Without this filter, the join creates 11x duplicate rows. pct_change() on
 # duplicates returns 0.0, which triggers the near-zero GDP guard and marks
 # every row as tapio_class='undefined'. This was the root cause of 88% undefined.
+#
+# The file also encodes BOTH country aggregates AND sub-national regions:
+#   REF_AREA == ISO  ->  the row IS the country aggregate
+#   REF_AREA != ISO  ->  the row is a sub-national region (e.g. FR1 = Ile-de-France,
+#                        parent ISO = FRA). Previously these region rows were
+#                        silently dropped -- v4 keeps them as a separate output table.
 
 pm25_raw = pd.read_csv(
     os.path.join(RAW, FILES["pm25"]),
-    usecols=["REF_AREA", "ISO", "TIME_PERIOD", "OBS_VALUE", "MEASURE", "EXPOSURE_LEVEL"],
+    usecols=["REF_AREA", "Reference area", "ISO", "ISO.1",
+             "TIME_PERIOD", "OBS_VALUE", "MEASURE", "EXPOSURE_LEVEL"],
     encoding="utf-8-sig",
     low_memory=False,
 )
 
-pm25 = pm25_raw[
-    (pm25_raw["REF_AREA"]       == pm25_raw["ISO"]) &  # country aggregate, not sub-regions
-    (pm25_raw["MEASURE"]        == "MEAN_POP")       &  # mean concentration
-    (pm25_raw["EXPOSURE_LEVEL"] == "_Z")                # no threshold filter (aggregate)
+pm25_clean = pm25_raw[
+    (pm25_raw["MEASURE"]        == "MEAN_POP") &  # mean concentration
+    (pm25_raw["EXPOSURE_LEVEL"] == "_Z")           # no threshold filter (aggregate)
 ].copy()
 
+# --- 4a. Country level ---
+pm25 = pm25_clean[pm25_clean["REF_AREA"] == pm25_clean["ISO"]].copy()
 pm25 = pm25.rename(columns={
     "REF_AREA":    "iso3",
     "TIME_PERIOD": "year",
@@ -142,16 +150,50 @@ pm25 = pm25.rename(columns={
 })
 pm25 = pm25[["iso3", "year", "pm25_ugm3"]].dropna(subset=["year"])
 pm25["year"] = pm25["year"].astype(int)
+pm25 = pm25.sort_values(["iso3", "year"])
+
+# 5-year rolling mean, same pattern used for tapio_E_5yr below (min_periods=3)
+pm25["pm25_ugm3_5yr"] = (
+    pm25.groupby("iso3")["pm25_ugm3"]
+    .transform(lambda x: x.rolling(5, min_periods=3).mean())
+)
 
 dups = pm25.duplicated(subset=["iso3", "year"]).sum()
 assert dups == 0, f"PM2.5 has {dups} duplicate country-year pairs -- filter is wrong"
 
-print(f"    {len(pm25):,} rows | {pm25['iso3'].nunique()} countries | "
+print(f"    Country level: {len(pm25):,} rows | {pm25['iso3'].nunique()} countries | "
       f"{pm25['year'].min()}-{pm25['year'].max()}")
+
+# --- 4b. Region level (new) ---
+pm25_region = pm25_clean[pm25_clean["REF_AREA"] != pm25_clean["ISO"]].copy()
+pm25_region = pm25_region.rename(columns={
+    "REF_AREA":      "region_code",
+    "Reference area":"region_name",
+    "ISO":           "iso3",
+    "ISO.1":         "country",
+    "TIME_PERIOD":   "year",
+    "OBS_VALUE":     "pm25_ugm3",
+})
+pm25_region = pm25_region[
+    ["region_code", "region_name", "iso3", "country", "year", "pm25_ugm3"]
+].dropna(subset=["year"])
+pm25_region["year"] = pm25_region["year"].astype(int)
+pm25_region = pm25_region.sort_values(["region_code", "year"])
+
+pm25_region["pm25_ugm3_5yr"] = (
+    pm25_region.groupby("region_code")["pm25_ugm3"]
+    .transform(lambda x: x.rolling(5, min_periods=3).mean())
+)
+
+dups = pm25_region.duplicated(subset=["region_code", "year"]).sum()
+assert dups == 0, f"PM2.5 regions has {dups} duplicate region-year pairs -- filter is wrong"
+
+print(f"    Region level:  {len(pm25_region):,} rows | {pm25_region['region_code'].nunique()} regions "
+      f"across {pm25_region['iso3'].nunique()} countries")
 print(f"    Note: 1990 and 1995 only before 2001; no data 2021-2023 (show 2020 in UI)")
 
 
-print("[5/6] Building merged panel...")
+print("[5/7] Building merged panel...")
 
 panel = pd.merge(
     ghg,
@@ -184,9 +226,11 @@ print(f"    {len(panel):,} rows | {panel['iso3'].nunique()} countries | "
       f"{panel['year'].min()}-{panel['year'].max()}")
 print(f"    PM2.5 coverage: {panel['pm25_ugm3'].notna().sum():,} rows "
       f"({panel['pm25_ugm3'].notna().mean()*100:.1f}%)")
+print(f"    PM2.5 5yr coverage: {panel['pm25_ugm3_5yr'].notna().sum():,} rows "
+      f"({panel['pm25_ugm3_5yr'].notna().mean()*100:.1f}%)")
 
 
-print("[6/6] Computing Tapio Elasticity Index...")
+print("[6/7] Computing Tapio Elasticity Index...")
 
 panel = panel.sort_values(["iso3", "year"]).reset_index(drop=True)
 
@@ -239,6 +283,14 @@ for cls, n in panel["tapio_class"].value_counts().items():
 print(f"    Breakdown of {undef} undefined: {first_yr} first-year NaN + "
       f"{undef - first_yr} genuine near-zero GDP growth")
 
+# Final column order
+panel = panel[[
+    "iso3", "country", "year",
+    "ghg_total_t_co2e", "gdp_pc_ppp_usd", "ghg_per_capita_kg_co2e",
+    "pm25_ugm3", "pm25_ugm3_5yr",
+    "ghg_pct_change", "gdp_pct_change",
+    "tapio_E", "tapio_E_5yr", "tapio_class", "tapio_class_5yr",
+]]
 
 
 print("[7/7] Loading climate projections...")
@@ -271,6 +323,7 @@ TAPIO_TO_SSP = {
 if not os.path.exists(CLIM_PATH):
     print(f"    Climate file not found at {CLIM_PATH}")
     print(f"    Skipping. Re-run once file is renamed to {FILES['climate']} in {RAW}/")
+    climate_wide = None
 else:
     chunks = []
     rows_read = rows_kept = 0
@@ -346,6 +399,10 @@ else:
 panel_path = os.path.join(OUT, "merged_panel.csv")
 panel.to_csv(panel_path, index=False)
 
+region_path = os.path.join(OUT, "pm25_regions.csv")
+pm25_region.to_csv(region_path, index=False)
+
 print(f"\nDone.")
-print(f"  merged_panel.csv    -> {len(panel):,} rows, {panel['iso3'].nunique()} countries")
-print(f"  Columns: {list(panel.columns)}")
+print(f"  merged_panel.csv  -> {len(panel):,} rows, {panel['iso3'].nunique()} countries")
+print(f"  pm25_regions.csv  -> {len(pm25_region):,} rows, {pm25_region['region_code'].nunique()} regions")
+print(f"  Panel columns: {list(panel.columns)}")
