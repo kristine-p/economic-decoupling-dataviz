@@ -4,7 +4,7 @@
 
 Can a nation expand its economy while simultaneously shrinking its environmental footprint? This dashboard explores the *Green Growth* hypothesis across 42 countries from 1990 to 2023, combining economic and environmental data into an interactive map-based visualization.
 
-🌍 **[Live dashboard →](https://breaking-the-link-economic-decoupling-dataviz.streamlit.app/)** 
+🌍 **Live dashboard:** https://breaking-the-link-economic-decoupling-dataviz.streamlit.app
 
 ---
 
