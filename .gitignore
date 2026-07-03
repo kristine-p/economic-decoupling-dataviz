@@ -218,3 +218,5 @@ __marimo__/
 .streamlit/secrets.toml
 data/raw/CLIM_PROJ_all.csv
 data/raw/GHG_all.csv
+
+data/raw/*.csv
