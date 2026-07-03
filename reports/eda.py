@@ -155,7 +155,15 @@ ax.tick_params(axis="x", rotation=45, labelsize=8)
 
 # Highlight COVID year
 ax.axvline(x=2020, color="#888", linestyle="--", linewidth=1, alpha=0.7)
-ax.text(2020.2, ax.get_ylim()[1] * 0.95, "COVID-19", fontsize=8, color="#888")
+ax.annotate(
+    "COVID-19",
+    xy=(2020, ax.get_ylim()[1] * 0.92),
+    xytext=(2017.5, ax.get_ylim()[1] * 0.92),
+    fontsize=8,
+    color="#888",
+    ha="center",
+    arrowprops=dict(arrowstyle="->", color="#888", lw=0.8),
+)
 
 # Legend outside
 handles = [
