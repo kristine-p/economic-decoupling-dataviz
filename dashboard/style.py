@@ -30,9 +30,9 @@ import streamlit as st
 COLORS = {
     "void":          "#E9EBEC",   # page background — soft grey, not black
     "void_deep":     "#DEE1E3",
-    "land":          "#CFD4D7",   # countries with no data
-    "land_line":     "rgba(0,0,0,0.10)",
-    "ocean":         "#B7C9CF",
+    "land":          "#D7DBDD",   # countries with no data
+    "land_line":     "rgba(0,0,0,0.07)",
+    "ocean":         "#C9D6DA",
     "panel":         "rgba(255,255,255,0.86)",   # glass panel fill
     "panel_solid":   "#FFFFFF",
     "panel_border":  "rgba(15,23,31,0.08)",

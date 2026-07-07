@@ -16,7 +16,7 @@ TAPIO_COLORS = {
     "recessive_decoupling":          "#7FAE8A",
     "recessive_coupling":            "#C7B18F",
     "strong_negative_decoupling":    "#B0715A",
-    "undefined":                     "#BFC5C8",
+    "undefined":                     "#C7CCD0",
 }
 
 TAPIO_COLORSCALES = {
@@ -27,7 +27,7 @@ TAPIO_COLORSCALES = {
     "recessive_decoupling":          ["#B9D6BF", "#4F7F5C"],
     "recessive_coupling":            ["#E1D3B4", "#8E7048"],
     "strong_negative_decoupling":    ["#CC9A80", "#5C2A1B"],
-    "undefined":                     ["#BFC5C8", "#BFC5C8"],
+    "undefined":                     ["#C7CCD0", "#C7CCD0"],
 }
 
 TAPIO_CLAMP = {
@@ -205,26 +205,20 @@ def default_analysis_year(historical_df: pd.DataFrame, coverage_floor: float = 0
 # ─────────────────────────────────────────
 
 def render_legend_hud():
-    """Compact legend rendered inline inside the floating right HUD panel.
-
-    Laid out as a 2-column grid per section (rather than one tall list) so
-    the whole legend takes roughly half the vertical space it used to --
-    the panel was dominating the screen when everything stacked in a single
-    column.
-    """
+    """Compact legend rendered inline inside the floating right HUD panel."""
     rows_html = []
     for section_title, items in LEGEND_ITEMS.items():
-        cells = []
+        rows = []
         for key, name, desc in items:
             light, dark = TAPIO_COLORSCALES[key]
-            cells.append(f"""
-                <div style="display:flex; align-items:flex-start; gap:7px;">
-                    <div style="width:11px; height:11px; border-radius:3px; flex-shrink:0; margin-top:2px;
-                                background:linear-gradient(135deg, {dark}, {light});
-                                border:1px solid rgba(15,23,31,0.12);"></div>
+            rows.append(f"""
+                <div style="display:flex; align-items:flex-start; gap:9px; margin-bottom:8px;">
+                    <div style="width:13px; height:30px; border-radius:3px; flex-shrink:0; margin-top:1px;
+                                background:linear-gradient(to bottom, {dark}, {light});
+                                border:1px solid rgba(15,23,31,0.10);"></div>
                     <div>
-                        <div style="font-size:0.71rem; font-weight:600; color:{COLORS['text']}; line-height:1.25;">{name}</div>
-                        <div style="font-size:0.61rem; color:{COLORS['text_dim']}; margin-top:1px; line-height:1.2;">{desc}</div>
+                        <div style="font-size:0.76rem; font-weight:600; color:{COLORS['text']};">{name}</div>
+                        <div style="font-size:0.66rem; color:{COLORS['text_dim']}; margin-top:1px; line-height:1.3;">{desc}</div>
                     </div>
                 </div>
             """)
