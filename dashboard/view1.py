@@ -179,6 +179,27 @@ def year_bounds(historical_df: pd.DataFrame, show_pm25: bool):
     return min_year, max_year
 
 
+def default_analysis_year(historical_df: pd.DataFrame, coverage_floor: float = 0.8) -> int:
+    """Pick a sensible default year for the initial map view.
+
+    The absolute latest year in the panel is usually the *worst* default:
+    GDP figures (World Bank) commonly lag 1-2 years behind for many
+    countries, so the final year or two often has far fewer countries
+    reporting than the panel's peak coverage -- which is exactly what makes
+    a freshly-loaded map look like "half the world is missing". This picks
+    the most recent year whose row count is still at least
+    `coverage_floor` (default 80%) of the panel's best year, so the initial
+    view is both recent and actually populated. The person can still drag
+    the slider to any year, including the sparser recent ones.
+    """
+    counts = historical_df.groupby("year").size()
+    if counts.empty:
+        return int(historical_df["year"].max())
+    threshold = counts.max() * coverage_floor
+    well_covered_years = counts[counts >= threshold].index
+    return int(well_covered_years.max())
+
+
 # ─────────────────────────────────────────
 # HUD RENDERERS
 # ─────────────────────────────────────────
@@ -202,13 +223,15 @@ def render_legend_hud():
                 </div>
             """)
         rows_html.append(f"""
-            <div class="hud-label" style="margin-bottom:8px;">{section_title}</div>
-            {''.join(rows)}
-            <hr class="hud-divider">
+            <div class="hud-label" style="margin-bottom:6px;">{section_title}</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 10px; margin-bottom:10px;">
+                {''.join(cells)}
+            </div>
+            <hr class="hud-divider" style="margin:6px 0;">
         """)
 
     st.html(f"""
-        <div style="padding:16px 16px 4px 16px;">
+        <div style="padding:14px 16px 2px 16px;">
         {''.join(rows_html)}
         </div>
     """)

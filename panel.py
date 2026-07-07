@@ -2,6 +2,10 @@
 """
 Preprocess raw OECD and World Bank data into a single panel for the decoupling dataviz
 v4 -- adds region-level PM2.5 output and 5-year rolling PM2.5 averages.
+v5 -- climate projections now also carry each measure's change vs. the
+      1981-2010 baseline (as published directly in the OECD file, e.g.
+      MEASURE=HOT_DAYS_PROJ_DIFF_1981_2010), plus a derived percentage-change
+      column computed from that diff and the absolute projected value.
 """
 
 import os
@@ -297,7 +301,17 @@ print("[7/7] Loading climate projections...")
 
 CLIM_PATH = os.path.join(RAW, FILES["climate"])
 
-MEASURES_KEEP  = {"HOT_DAYS_PROJ", "TROP_NIGHTS_PROJ", "ICING_DAYS_PROJ"}
+# Absolute projected-day measures (as before)...
+BASE_MEASURES = {"HOT_DAYS_PROJ", "TROP_NIGHTS_PROJ", "ICING_DAYS_PROJ"}
+
+# ...and each one's published change vs. the 1981-2010 historical baseline,
+# e.g. MEASURE=HOT_DAYS_PROJ_DIFF_1981_2010, OBS_VALUE in days/year. We keep
+# both the absolute projection and the baseline diff, then derive a
+# percentage-change column from the two (see below).
+DIFF_SUFFIX = "_DIFF_1981_2010"
+DIFF_MEASURES = {f"{m}{DIFF_SUFFIX}" for m in BASE_MEASURES}
+MEASURES_KEEP = BASE_MEASURES | DIFF_MEASURES
+
 SCENARIOS_KEEP = {"PROJ_SSP126", "PROJ_SSP245", "PROJ_SSP370", "PROJ_SSP585"}
 COLS_KEEP      = ["TERRITORIAL_LEVEL", "REF_AREA", "COUNTRY",
                   "MEASURE", "PROJ_SCENARIO", "TIME_PERIOD", "OBS_VALUE"]
@@ -319,6 +333,11 @@ TAPIO_TO_SSP = {
     "strong_negative_decoupling":     "PROJ_SSP585",
     "undefined":                      "PROJ_SSP245",
 }
+
+# a baseline this small (day-count from the 1981-2010 average) makes a
+# percentage change explode or divide-by-zero without being meaningful --
+# mirrors the near-zero GDP growth guard used for the Tapio index above.
+BASELINE_EPS_DAYS = 1.0
 
 if not os.path.exists(CLIM_PATH):
     print(f"    Climate file not found at {CLIM_PATH}")
@@ -342,6 +361,15 @@ else:
             chunk["MEASURE"].isin(MEASURES_KEEP) &
             chunk["PROJ_SCENARIO"].isin(SCENARIOS_KEEP)
         ]
+        # guard against stray non-numeric rows (e.g. a duplicated header line
+        # embedded in the data) silently turning OBS_VALUE into a string
+        # column for the whole file once chunks are concatenated
+        bad_before = len(chunk)
+        chunk = chunk.copy()
+        chunk["OBS_VALUE"] = pd.to_numeric(chunk["OBS_VALUE"], errors="coerce")
+        chunk = chunk.dropna(subset=["OBS_VALUE"])
+        if len(chunk) < bad_before and bad_before > 0:
+            print(f"    ... dropped {bad_before - len(chunk)} row(s) with non-numeric OBS_VALUE")
 
         if len(chunk) > 0:
             chunks.append(chunk)
@@ -370,15 +398,59 @@ else:
         aggfunc="mean",
     ).reset_index()
     climate_wide.columns.name = None
-    climate_wide = climate_wide.rename(columns={
-        "HOT_DAYS_PROJ":    "hot_days_proj",
-        "TROP_NIGHTS_PROJ": "trop_nights_proj",
-        "ICING_DAYS_PROJ":  "icing_days_proj",
-    })
+
+    # rename whichever absolute/diff measure columns actually came back from
+    # the source file -- don't assume every base metric has a matching diff
+    # column, some regions/metrics may not publish one.
+    rename_map = {}
+    for m in BASE_MEASURES:
+        if m in climate_wide.columns:
+            rename_map[m] = m.lower()
+        diff_col = f"{m}{DIFF_SUFFIX}"
+        if diff_col in climate_wide.columns:
+            rename_map[diff_col] = f"{m.lower()}_diff_1981_2010"
+    climate_wide = climate_wide.rename(columns=rename_map)
+
+    # derive % change vs. the 1981-2010 baseline for every metric that has
+    # both its absolute projection and its diff column present:
+    #   baseline   = projected - diff       (diff is defined as projected - baseline)
+    #   pct_change = diff / baseline * 100, undefined (NaN) when the baseline
+    #                is too close to zero to make a percentage meaningful
+    pct_change_cols = []
+    for m in BASE_MEASURES:
+        abs_col  = m.lower()
+        diff_col = f"{m.lower()}_diff_1981_2010"
+        pct_col  = f"{m.lower()}_pct_change_1981_2010"
+        if abs_col in climate_wide.columns and diff_col in climate_wide.columns:
+            baseline = climate_wide[abs_col] - climate_wide[diff_col]
+            climate_wide[pct_col] = np.where(
+                baseline.abs() < BASELINE_EPS_DAYS,
+                np.nan,
+                climate_wide[diff_col] / baseline * 100,
+            )
+            pct_change_cols.append(pct_col)
+        else:
+            print(f"    Note: no {DIFF_SUFFIX} measure found for {m} -- "
+                  f"skipping its percentage-change column")
+
     climate_wide["scenario_label"] = climate_wide["scenario"].map(SCENARIO_LABELS)
 
+    # Use the most recent *well-covered* year, not the literal max year --
+    # the panel's very last year is typically sparse (World Bank GDP data
+    # lags 1-2 years for many countries, per default_analysis_year() in
+    # view1.py), so anchoring to panel["year"].max() left most countries
+    # with tapio_class == NaN for that year, which produced linked_ssp = NaN
+    # and made is_linked_scenario False for ALL of that country's rows --
+    # silently hiding it from the entire "Current trajectory (linked)" view.
+    year_counts = panel.groupby("year").size()
+    coverage_threshold = year_counts.max() * 0.8
+    well_covered_years = year_counts[year_counts >= coverage_threshold].index
+    linked_reference_year = int(well_covered_years.max())
+    print(f"    Using {linked_reference_year} (well-covered year) to determine each "
+          f"country's linked SSP scenario, not the sparser {panel['year'].max()}")
+
     tapio_latest = (
-        panel[panel["year"] == panel["year"].max()]
+        panel[panel["year"] == linked_reference_year]
         [["iso3", "tapio_class"]]
         .copy()
     )
@@ -390,6 +462,10 @@ else:
     print(f"    Climate table: {len(climate_wide):,} rows | "
           f"{climate_wide['iso3'].nunique()} countries | "
           f"{int(climate_wide['year'].min())}-{int(climate_wide['year'].max())}")
+    for pct_col in pct_change_cols:
+        cov = climate_wide[pct_col].notna().mean() * 100
+        print(f"    {pct_col}: {cov:.1f}% coverage "
+              f"(rest undefined -- baseline within +/-{BASELINE_EPS_DAYS:g} days of zero)")
 
     clim_path = os.path.join(OUT, "climate_projections.csv")
     climate_wide.to_csv(clim_path, index=False)

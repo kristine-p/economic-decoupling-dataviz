@@ -5,11 +5,22 @@ author: "Kristine Paegle, Giuseppe Pio Mangiacotti, Martin Krisak"
 geometry: "left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm"
 format:
   pdf:
-    latex_engine: xelatex
+    pdf-engine: pdflatex
     toc: true
     number-sections: true
     colorlinks: true
     linkcolor: "darkgreen"
+    include-in-header:
+      - text: |
+          \usepackage[utf8]{inputenc}
+          \usepackage[T1]{fontenc}
+          \usepackage{textcomp}
+          \usepackage{mathptmx}
+          \usepackage{amsmath}
+          \setkomafont{disposition}{\normalfont\bfseries}
+          \RedeclareSectionCommand[beforeskip=0.6\baselineskip,afterskip=0.3\baselineskip]{section}
+          \RedeclareSectionCommand[beforeskip=0.4\baselineskip,afterskip=0.2\baselineskip]{subsection}
+          \RedeclareSectionCommand[beforeskip=0.3\baselineskip,afterskip=0.2\baselineskip]{subsubsection}
 execute:
   echo: false
   warning: false
@@ -42,8 +53,8 @@ The dataset contains emissions data across multiple pollutants, measures, and un
 | `TIME_PERIOD` | Year of observation |
 | `OBS_VALUE` | GHG emissions value |
 | `MEASURE` | Type of measure (total, per capita, etc.) |
-| `UNIT_MEASURE` | Unit (tonnes CO₂-equivalent, kg per person, etc.) |
-| `POLLUTANT` | Pollutant type (GHG, CO₂, etc.) |
+| `UNIT_MEASURE` | Unit (tonnes CO$_2$-equivalent, kg per person, etc.) |
+| `POLLUTANT` | Pollutant type (GHG, CO$_2$, etc.) |
 
 The raw file contains 30 columns, of which 7 are entirely redundant (e.g., structural metadata fields with no analytical value).
 
@@ -52,8 +63,8 @@ The raw file contains 30 columns, of which 7 are entirely redundant (e.g., struc
 To obtain a clean, unambiguous time series suitable for the Tapio Index calculation, three filters were applied simultaneously:
 
 - `MEASURE = "_T"` — total emissions, excluding sector breakdowns
-- `UNIT_MEASURE = "T_CO2E"` — tonnes of CO₂-equivalent
-- `POLLUTANT = "GHG"` — all greenhouse gases (excluding CO₂-only rows which would create duplicate country-year pairs)
+- `UNIT_MEASURE = "T_CO2E"` — tonnes of CO$_2$-equivalent
+- `POLLUTANT = "GHG"` — all greenhouse gases (excluding CO$_2$-only rows which would create duplicate country-year pairs)
 
 These filters reduce the dataset to approximately 2,500 rows covering 94 entities. After excluding aggregate codes (OECD, EU27_2020, OECDA, OECDE, OECDSO), **47 individual countries** remain. Of these, **37 countries** have complete data for the full 2000–2023 period.
 
@@ -104,22 +115,56 @@ The dataset is melted from wide to long format, retaining years 1990–2023 to a
 
 The dataset contains 11 rows per country-year combination, corresponding to different measurement types and WHO threshold bands. The key distinction is between:
 
-- `MEASURE = "MEAN_POP"` with `EXPOSURE_LEVEL = "_Z"` — mean population-weighted PM2.5 concentration in µg/m³ **(selected)**
+- `MEASURE = "MEAN_POP"` with `EXPOSURE_LEVEL = "_Z"` — mean population-weighted PM2.5 concentration in $\mu$g/m$^3$ **(selected)**
 - `MEASURE = "POP_EXP_POL"` — share of population exposed at 10 different WHO threshold bands (10 rows per country-year) **(excluded)**
 
-We selected the mean concentration measure as it provides an objective, continuous, and internationally comparable value directly aligned with WHO guidelines (5 µg/m³ annual mean).
+We selected the mean concentration measure as it provides an objective, continuous, and internationally comparable value directly aligned with WHO guidelines (5 $\mu$g/m$^3$ annual mean).
 
 | Variable | Description |
 |----------|-------------|
 | `REF_AREA` | ISO-3 country code |
 | `TIME_PERIOD` | Year of observation |
-| `OBS_VALUE` | Mean PM2.5 concentration (µg/m³) |
+| `OBS_VALUE` | Mean PM2.5 concentration ($\mu$g/m$^3$) |
 
 ### Data Quality
 
 - **Time range limitation:** Data ends in 2020. For the dashboard, years 2021–2023 are left as NaN and the UI restricts the PM2.5 view to 2000–2020
 - **Duplicate risk:** Without the dual filter (`MEAN_POP` + `_Z`), 11 rows per country-year are returned, causing duplicate key errors and corrupting the Tapio Index calculation (pct_change returns 0 on duplicates, triggering the near-zero GDP guard)
 - **Coverage:** Broader than OECD-only, covering most countries in the merged panel
+
+### Sub-national Region Level (PM2.5 Bubbles Layer)
+
+The same OECD PM2.5 file also encodes sub-national regional data alongside country aggregates. The distinction is structural: rows where `REF_AREA` equals `ISO` represent the country aggregate, while rows where `REF_AREA` differs from `ISO` represent a sub-national region (e.g. `FR1` for Île-de-France, parent country `FRA`). Previous versions of the pipeline silently dropped these region rows; version 4 retains them as a separate output.
+
+The motivation for extracting regional data is visualisation quality: plotting a single bubble per country at its geographic centroid produces a sparse, coarse-grained air quality map. Regional bubbles, by contrast, expose intra-country variation — the contrast between heavily industrialised and rural areas within the same country — which is invisible at country level and directly relevant to the health dimension of the decoupling narrative.
+
+The region-level output (`pm25_regions.csv`) contains **16,629 rows** across **723 sub-national regions** in **52 countries**, covering 1990–2020. It shares the same dual filter (`MEAN_POP` + `_Z`) as the country-level table, and a 5-year rolling mean (`pm25_ugm3_5yr`) is computed at region level using the same `min_periods=3` window applied to the country panel.
+
+| Variable | Description |
+|----------|-------------|
+| `region_code` | OECD sub-national region code (e.g. `FR1`) |
+| `region_name` | Human-readable region name |
+| `iso3` | Parent country ISO-3 code |
+| `country` | Parent country name |
+| `year` | Year of observation |
+| `pm25_ugm3` | Mean PM2.5 concentration ($\mu$g/m$^3$) |
+| `pm25_ugm3_5yr` | 5-year rolling mean PM2.5 concentration |
+
+### Geocoding of Region Centroids
+
+Plotly's `Scattergeo` layer requires explicit latitude/longitude coordinates for bubble placement. Since the OECD data provides only region codes and names (no geometry), a separate geocoding step (`geocode.py`) was developed to enrich `pm25_regions.csv` with centroid coordinates.
+
+The geocoder uses the **Nominatim API** (OpenStreetMap) via the `geopy` library, querying each unique region by name and parent country (e.g. `"Île-de-France, France"`). To comply with Nominatim's usage policy, requests are rate-limited to one per 1.2 seconds.
+
+Two categories of lookup failures were encountered and resolved:
+
+1. **OECD naming conventions:** Many region names in the source data include bureaucratic suffixes (`(TL2021)`, `(TL2016)`) or generic English translations (`"North West"`, `"South East"`) that Nominatim cannot resolve because they do not match local administrative names. These were handled via a manually curated override map of 60+ entries mapping OECD labels to locally recognised equivalents (e.g. `"North West"` $\rightarrow$ `"Severozapaden"` for Bulgaria).
+
+2. **Country name normalisation:** Several OECD country names are incompatible with Nominatim's geocoder (e.g. `"China (People's Republic of)"`, `"Türkiye"`, `"Slovak Republic"`). These are normalised to their common English equivalents before querying.
+
+To avoid losing progress during long runs, the geocoder saves results incrementally after each region lookup, enabling safe resumption if interrupted. The final output (`pm25_regions_geocoded.csv`) achieves **100% coordinate coverage across all 723 regions** — no regions required manual coordinate assignment.
+
+**Note on coordinate precision:** Nominatim returns the administrative centroid of each region as determined by OpenStreetMap, not a population-weighted centroid. Bubble placement is therefore approximate for regions with uneven population distribution, though the visual effect is acceptable given the scale of a world map.
 
 
 ## Climate Projections by SSP Scenario (OECD)
@@ -134,7 +179,7 @@ We selected the mean concentration measure as it provides an objective, continuo
 This dataset provides projections of three climate indicators under four SSP scenarios:
 
 | Measure | Description |
-|---------|-------------|
+|:-|:---|
 | `HOT_DAYS_PROJ` | Projected number of days per year where max temperature > 35°C |
 | `TROP_NIGHTS_PROJ` | Projected number of nights per year where min temperature > 20°C |
 | `ICING_DAYS_PROJ` | Projected number of days per year where max temperature < 0°C |
@@ -174,13 +219,17 @@ This mapping allows View 3 of the dashboard to show users: *"if your country con
 
 ## Merged Panel
 
-The four datasets are joined into a single `merged_panel.csv` using `(iso3, year)` as a composite key:
+The preprocessing pipeline (`panel.py`) produces two output files from the four source datasets.
+
+The primary output, `merged_panel.csv`, is built by joining datasets using `(iso3, year)` as a composite key:
 
 1. **GHG total emissions** ← inner join with **GDP per capita** (only countries with both variables)
 2. Result ← left join with **GHG per capita** (tooltip layer)
-3. Result ← left join with **PM2.5** (2021–2023 will be NaN by design)
+3. Result ← left join with **PM2.5 country-level** (2021–2023 will be NaN by design)
 
 The final panel covers **42 countries** and **34 years** (1990–2023), yielding approximately 1,400 rows.
+
+A second output, `pm25_regions.csv`, is produced independently from the sub-national branch of the PM2.5 source file (see Section 2.3). It is not merged into the main panel — instead it is loaded separately by the dashboard and enriched with geographic coordinates via the geocoding step described above, producing `pm25_regions_geocoded.csv` as the final input to the PM2.5 bubble layer.
 
 ## Tapio Elasticity Index
 
@@ -188,19 +237,19 @@ The Tapio Decoupling Elasticity Index (E) is computed as:
 
 $$E = \frac{\Delta\%\text{GHG}}{\Delta\%\text{GDP}}$$
 
-Where $\Delta\%$ denotes the year-over-year percentage change. The index is left undefined when GDP growth is near zero (|Δ%GDP| < 0.01) to avoid division by extremely small numbers.
+Where $\Delta\%$ denotes the year-over-year percentage change. The index is left undefined when GDP growth is near zero (|$\Delta$%GDP| < 0.01) to avoid division by extremely small numbers.
 
 A **5-year rolling mean** of E is also computed to smooth COVID-2020 outliers and other short-term shocks, providing a more stable signal for the choropleth map. Countries are then classified into Tapio's 8-category typology:
 
 | Category | Condition |
 |----------|-----------|
-| Absolute Decoupling | GDP↑, E ≤ 0 |
-| Relative Decoupling | GDP↑, 0 < E < 0.8 |
-| Expansive Coupling | GDP↑, 0.8 ≤ E < 1.2 |
-| Expansive Negative Decoupling | GDP↑, E ≥ 1.2 |
-| Recessive Decoupling | GDP↓, E > 1.2 |
-| Recessive Coupling | GDP↓, 0 < E ≤ 1.2 |
-| Strong Negative Decoupling | GDP↓, E ≤ 0 |
+| Absolute Decoupling | GDP$\uparrow$, E $\leq$ 0 |
+| Relative Decoupling | GDP$\uparrow$, 0 < E < 0.8 |
+| Expansive Coupling | GDP$\uparrow$, 0.8 $\leq$ E < 1.2 |
+| Expansive Negative Decoupling | GDP$\uparrow$, E $\geq$ 1.2 |
+| Recessive Decoupling | GDP$\downarrow$, E > 1.2 |
+| Recessive Coupling | GDP$\downarrow$, 0 < E $\leq$ 1.2 |
+| Strong Negative Decoupling | GDP$\downarrow$, E $\leq$ 0 |
 | Undefined | Near-zero GDP growth or missing data |
 
 ## Known Limitations
@@ -210,6 +259,8 @@ A **5-year rolling mean** of E is also computed to smooth COVID-2020 outliers an
 - **COVID-2020 distortion:** The 2020 year shows extreme Tapio values for most countries due to simultaneous GDP and emissions collapses. The 5-year rolling average mitigates this but annual view will still show anomalies
 - **GHG per capita vs total:** The Tapio Index is calculated using **total** GHG emissions (not per capita), as the decoupling relationship is between aggregate economic output and aggregate environmental pressure. Per capita figures are retained as a tooltip layer only
 - **Interpolation:** Linear interpolation is applied within country groups to fill internal gaps in the PM2.5 and GDP series, which may introduce slight inaccuracies for countries with extended missing periods
+- **Region centroid approximation:** Sub-national PM2.5 bubble positions are based on Nominatim administrative centroids rather than population-weighted centroids. For large or unevenly populated regions, the bubble may appear displaced relative to where most of the exposed population lives
+- **Geocoding reproducibility:** Nominatim results depend on OpenStreetMap's current data and may change between runs as OSM coverage evolves. The geocoded coordinates are therefore committed to the repository as a static file rather than re-generated at runtime
 
 
 # Exploratory Data Analysis
@@ -234,7 +285,7 @@ Figure 3 compares GDP per capita against GHG emissions per capita in 2000 and 20
 
 ## PM2.5 Air Quality Trends
 
-Figure 4 shows PM2.5 exposure trends for a selection of countries. Western nations (Germany, USA, Japan) show consistent decline toward but still above the WHO guideline of 5 µg/m³. China shows a declining trend after peaking around 2006. India remains persistently high. The data gap after 2020 is clearly marked and is acknowledged as a limitation in View 2 of the dashboard.
+Figure 4 shows PM2.5 exposure trends for a selection of countries. Western nations (Germany, USA, Japan) show consistent decline toward but still above the WHO guideline of 5 $\mu$g/m$^3$. China shows a declining trend after peaking around 2006. India remains persistently high. The data gap after 2020 is clearly marked and is acknowledged as a limitation in View 2 of the dashboard.
 
 ![PM2.5 mean population exposure over time for selected countries.](figures/fig4_pm25_timeseries.png){width=100%}
 

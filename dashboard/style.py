@@ -73,14 +73,41 @@ def inject_base_css():
 }}
 
 /* ---------- reset the Streamlit chrome ---------- */
-#MainMenu, footer, header {{ visibility: hidden; }}
-[data-testid="stToolbar"] {{ display: none; }}
-[data-testid="stDecoration"] {{ display: none; }}
-[data-testid="stStatusWidget"] {{ display: none; }}
+/* display:none (not visibility:hidden) so these elements stop reserving
+   layout space entirely -- visibility:hidden was leaving a tall empty
+   "banner" strip at the very top of the page, since Streamlit's header
+   still occupied its normal box even though invisible. */
+#MainMenu, footer, header, [data-testid="stHeader"] {{
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+}}
+[data-testid="stToolbar"] {{ display: none !important; }}
+[data-testid="stDecoration"] {{ display: none !important; }}
+[data-testid="stStatusWidget"] {{ display: none !important; }}
+[data-testid="stAppViewBlockContainer"] {{ padding-top: 0 !important; }}
 .block-container {{
     padding: 0 !important;
     margin: 0 !important;
     max-width: 100% !important;
+}}
+/* a transform/filter/contain/perspective on any ancestor of our fixed HUD
+   panels would make that ancestor -- not the viewport -- the containing
+   block for position:fixed, throwing off every inset:0/top:.. calculation
+   above. Neutralize that on Streamlit's own wrapper elements defensively. */
+html, body,
+div[data-testid="stAppViewContainer"],
+section[data-testid="stMain"],
+div[data-testid="stMainBlockContainer"],
+div[data-testid="stApp"] {{
+    transform: none !important;
+    filter: none !important;
+    perspective: none !important;
+    contain: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 100vh !important;
 }}
 div[data-testid="stAppViewContainer"] {{ background: {COLORS['void']}; }}
 section[data-testid="stMain"] {{ background: {COLORS['void']}; }}
@@ -96,7 +123,7 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 /* shared glass-panel shell, reused by every floating HUD element so they
    can never visually drift apart from each other */
 .hud-panel, .st-key-topbar .brand-wrap, .st-key-navpill div[role="radiogroup"],
-.st-key-sidepanel, .st-key-leftpanel, .st-key-timeline {{
+.st-key-sidepanel, .st-key-timeline {{
     background: {COLORS['panel']};
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
@@ -138,7 +165,7 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
     margin-top: 2px;
 }}
 
-.st-key-navpill_align {{ display: flex; justify-content: flex-end; }}
+.st-key-navpill_align {{ display: flex; justify-content: center; }}
 
 .st-key-navpill div[role="radiogroup"] {{
     border-radius: 999px;
@@ -169,8 +196,19 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
     top: calc(var(--gap) + var(--topbar-h) + var(--panel-gap));
     right: var(--gap);
     width: var(--panel-w);
-    max-height: calc(100vh - var(--gap) - var(--topbar-h) - var(--panel-gap) - 190px);
+    /* The sidepanel sits in the top-right corner; the timeline dock sits
+       bottom-left/center and its right edge stops --panel-gap short of the
+       sidepanel's left edge (see .st-key-timeline below) -- the two never
+       share vertical space. There is no layout reason to reserve extra
+       room at the bottom for the timeline, so the sidepanel's bottom
+       margin should simply mirror its top gap, not an unrelated fixed
+       pixel count. The old "- 190px" term was dead margin that truncated
+       the legend / country trend chart earlier than necessary, forcing an
+       unneeded scrollbar. */
+    max-height: calc(100vh - var(--gap) - var(--topbar-h) - var(--panel-gap) - var(--gap));
     overflow-y: auto;
+    overflow-anchor: none;   /* stop the browser auto-scrolling this box as
+                                 Streamlit streams content into it */
     z-index: 998;
     border-radius: var(--radius);
     padding: 4px;
@@ -182,29 +220,14 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 .st-key-country_select_wrap {{ padding: 0 16px; }}
 .st-key-hud_kv_wrap {{ padding: 0 16px; }}
 
-/* ---------- left HUD panel ---------- */
-.st-key-leftpanel {{
-    position: fixed;
-    top: calc(var(--gap) + var(--topbar-h) + var(--panel-gap));
-    left: var(--gap);
-    width: var(--panel-w);
-    max-height: calc(100vh - var(--gap) - var(--topbar-h) - var(--panel-gap) - 190px);
-    overflow-y: auto;
-    z-index: 998;
-    border-radius: var(--radius);
-    padding: 16px;
-}}
-.st-key-leftpanel::-webkit-scrollbar {{ width: 5px; }}
-.st-key-leftpanel::-webkit-scrollbar-thumb {{ background: rgba(15,23,31,0.18); border-radius: 3px; }}
-
 /* ---------- bottom timeline dock ---------- */
-/* left/right insets keep the timeline between the left/right HUD panels */
+/* right-inset is derived from the same --panel-w/--gap tokens as the
+   sidepanel, so the two can never drift out of alignment with each other */
 .st-key-timeline {{
     position: fixed;
     bottom: var(--gap);
-    left: calc(var(--panel-w) + var(--gap) + var(--panel-gap));
+    left: var(--gap);
     right: calc(var(--panel-w) + var(--gap) + var(--panel-gap));
-    width: auto !important;
     z-index: 998;
     border-radius: var(--radius);
     padding: 12px 22px 6px 22px;
@@ -273,3 +296,26 @@ def hud_kv(label: str, value: str, accent: bool = False):
     <span class="hud-value" style="font-size:0.82rem; color:{color};">{value}</span>
 </div>
 """)
+
+
+def pin_sidepanel_scroll():
+    """Belt-and-suspenders fix alongside the `overflow-anchor: none` CSS rule
+    above: the sidepanel streams in several widgets (stat block, legend,
+    expander) across a single rerun, and browsers can auto-scroll a fixed,
+    scrollable container to keep a newly-focused or newly-inserted element
+    in view -- which visually crops the top of the panel. Call this once,
+    after the sidepanel's content is fully rendered, to force it back to the
+    top a few times as those late elements (e.g. the Plotly chart) settle.
+    """
+    st.html("""
+<script>
+(function() {
+    function pin() {
+        var panel = document.querySelector('.st-key-sidepanel');
+        if (panel) { panel.scrollTop = 0; }
+    }
+    pin();
+    [50, 150, 300, 600, 1000].forEach(function(t) { setTimeout(pin, t); });
+})();
+</script>
+""", unsafe_allow_javascript=True)
