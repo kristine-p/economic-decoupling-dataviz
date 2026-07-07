@@ -96,7 +96,7 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 /* shared glass-panel shell, reused by every floating HUD element so they
    can never visually drift apart from each other */
 .hud-panel, .st-key-topbar .brand-wrap, .st-key-navpill div[role="radiogroup"],
-.st-key-sidepanel, .st-key-timeline {{
+.st-key-sidepanel, .st-key-leftpanel, .st-key-timeline {{
     background: {COLORS['panel']};
     backdrop-filter: blur(18px) saturate(140%);
     -webkit-backdrop-filter: blur(18px) saturate(140%);
@@ -182,14 +182,29 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 .st-key-country_select_wrap {{ padding: 0 16px; }}
 .st-key-hud_kv_wrap {{ padding: 0 16px; }}
 
+/* ---------- left HUD panel ---------- */
+.st-key-leftpanel {{
+    position: fixed;
+    top: calc(var(--gap) + var(--topbar-h) + var(--panel-gap));
+    left: var(--gap);
+    width: var(--panel-w);
+    max-height: calc(100vh - var(--gap) - var(--topbar-h) - var(--panel-gap) - 190px);
+    overflow-y: auto;
+    z-index: 998;
+    border-radius: var(--radius);
+    padding: 16px;
+}}
+.st-key-leftpanel::-webkit-scrollbar {{ width: 5px; }}
+.st-key-leftpanel::-webkit-scrollbar-thumb {{ background: rgba(15,23,31,0.18); border-radius: 3px; }}
+
 /* ---------- bottom timeline dock ---------- */
-/* right-inset is derived from the same --panel-w/--gap tokens as the
-   sidepanel, so the two can never drift out of alignment with each other */
+/* left/right insets keep the timeline between the left/right HUD panels */
 .st-key-timeline {{
     position: fixed;
     bottom: var(--gap);
-    left: var(--gap);
+    left: calc(var(--panel-w) + var(--gap) + var(--panel-gap));
     right: calc(var(--panel-w) + var(--gap) + var(--panel-gap));
+    width: auto !important;
     z-index: 998;
     border-radius: var(--radius);
     padding: 12px 22px 6px 22px;

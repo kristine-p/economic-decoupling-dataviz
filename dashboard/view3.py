@@ -84,7 +84,7 @@ def _add_choropleth(fig, df, metric_col, row=None, col=None):
             colorscale=THERMAL_SCALE,
             showscale=(row is None or (row == 1 and col == 1)),
             colorbar=dict(
-                thickness=10, len=0.4, x=0.0 if row else 1.02,
+                thickness=10, len=0.4, x=0.18,
                 y=0.22, xanchor="left",
                 tickfont=dict(size=10, color=COLORS["text_dim"], family="JetBrains Mono"),
                 outlinewidth=0, bgcolor="rgba(0,0,0,0)",
@@ -124,8 +124,8 @@ def build_compare_map(df_left: pd.DataFrame, df_right: pd.DataFrame, metric_col:
             go.Choropleth(
                 locations=df["iso3"], z=df[metric_col],
                 zmin=0, zmax=zmax, colorscale=THERMAL_SCALE,
-                showscale=(c == 2),
-                colorbar=dict(thickness=10, len=0.4, x=1.02, y=0.22,
+                showscale=(c == 1),
+                colorbar=dict(thickness=10, len=0.4, x=0.18, y=0.22, xanchor="left",
                                tickfont=dict(size=10, color=COLORS["text_dim"], family="JetBrains Mono"),
                                outlinewidth=0, bgcolor="rgba(0,0,0,0)"),
                 marker_line_color="rgba(15,23,31,0.16)", marker_line_width=0.4,

@@ -74,25 +74,26 @@ with st.container(key="topbar"):
 # ═════════════════════════════════════════
 if active_view == "Decoupling Map":
 
-    # ---- bottom timeline dock (controls) ----
+    # ---- left HUD panel (controls) ----
+    with st.container(key="leftpanel"):
+        st.html('<div style="padding:0 0 6px 0;" class="hud-label">MAP CONTROLS</div>')
+        smoothing = st.radio(
+            "View mode", ["Annual", "5-year rolling average"],
+            key="smoothing_v1",
+        )
+        st.html('<hr class="hud-divider" style="margin:12px 0;">')
+        show_pm25 = st.toggle("Air quality layer", value=False, key="show_pm25")
+
+    # ---- bottom timeline dock (slider) ----
     with st.container(key="timeline"):
-        c1, c2, c3 = st.columns([1.3, 1, 3])
-        with c1:
-            smoothing = st.radio(
-                "View mode", ["Annual", "5-year rolling average"],
-                horizontal=True, key="smoothing_v1", label_visibility="collapsed",
-            )
-        with c2:
-            show_pm25 = st.toggle("Air quality layer", value=False, key="show_pm25")
-        with c3:
-            min_year, max_year = view1.year_bounds(historical_df, show_pm25)
-            default_year = st.session_state.get("slider_v1", max_year)
-            default_year = min(max(default_year, min_year), max_year)
-            selected_year = st.slider(
-                f"Timeline — {min_year} to {max_year}",
-                min_value=min_year, max_value=max_year,
-                value=default_year, step=1, key="slider_v1", format="%d",
-            )
+        min_year, max_year = view1.year_bounds(historical_df, show_pm25)
+        default_year = st.session_state.get("slider_v1", max_year)
+        default_year = min(max(default_year, min_year), max_year)
+        selected_year = st.slider(
+            f"Timeline — {min_year} to {max_year}",
+            min_value=min_year, max_value=max_year,
+            value=default_year, step=1, key="slider_v1", format="%d",
+        )
         if show_pm25:
             st.html(
                 f'<div style="font-size:0.68rem; color:{COLORS["text_faint"]}; margin-top:-4px;">'
@@ -124,43 +125,33 @@ else:
     compare_precheck = st.session_state.get("compare_v3", False)
     alt_options = [s for s in view3.scenario_options() if s != view3.LINKED_LABEL]
 
-    with st.container(key="timeline"):
-        if compare_precheck:
-            c1, c2, c3, c4, c5 = st.columns([1.4, 1.1, 1.1, 0.9, 1.9])
-        else:
-            c1, c2, c3, c4 = st.columns([1.4, 1.4, 0.9, 2.2])
-        with c1:
-            metric_label = st.radio(
-                "Metric", list(view3.METRIC_COLS.keys()),
-                horizontal=True, key="metric_v3", label_visibility="collapsed",
+    # ---- left HUD panel (controls) ----
+    with st.container(key="leftpanel"):
+        st.html('<div style="padding:0 0 6px 0;" class="hud-label">SCENARIO CONTROLS</div>')
+        metric_label = st.radio(
+            "Metric", list(view3.METRIC_COLS.keys()),
+            key="metric_v3",
+        )
+        st.html('<hr class="hud-divider" style="margin:12px 0;">')
+        scenario_label = st.selectbox(
+            "Scenario", view3.scenario_options(), key="scenario_v3",
+        )
+        st.html('<hr class="hud-divider" style="margin:12px 0;">')
+        compare_mode = st.toggle("Compare", value=compare_precheck, key="compare_v3")
+        if compare_mode:
+            alt_scenario = st.selectbox(
+                "Compare against", alt_options, key="alt_scenario_v3",
             )
-        with c2:
-            scenario_label = st.selectbox(
-                "Scenario", view3.scenario_options(), key="scenario_v3", label_visibility="collapsed",
-            )
-        if compare_precheck:
-            with c3:
-                alt_scenario = st.selectbox(
-                    "Compare against", alt_options, key="alt_scenario_v3", label_visibility="collapsed",
-                )
-            with c4:
-                compare_mode = st.toggle("Compare", value=False, key="compare_v3")
-            with c5:
-                year3 = st.slider(
-                    "Projection year — 2030 to 2060",
-                    min_value=2030, max_value=2060,
-                    value=st.session_state.get("year_v3", 2050), step=1, key="year_v3", format="%d",
-                )
         else:
-            with c3:
-                compare_mode = st.toggle("Compare", value=False, key="compare_v3")
-            with c4:
-                year3 = st.slider(
-                    "Projection year — 2030 to 2060",
-                    min_value=2030, max_value=2060,
-                    value=st.session_state.get("year_v3", 2050), step=1, key="year_v3", format="%d",
-                )
             alt_scenario = st.session_state.get("alt_scenario_v3", alt_options[-1])
+
+    # ---- bottom timeline dock (slider) ----
+    with st.container(key="timeline"):
+        year3 = st.slider(
+            "Projection year — 2030 to 2060",
+            min_value=2030, max_value=2060,
+            value=st.session_state.get("year_v3", 2050), step=1, key="year_v3", format="%d",
+        )
 
     metric_col = view3.METRIC_COLS[metric_label]
 
