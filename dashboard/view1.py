@@ -124,17 +124,17 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class", fogged: b
                 e_val=subset[e_col].round(3),
             )[["country", "tapio_class_label", "gdp_pct_change", "ghg_pct_change", "e_val"]].values,
             marker_line_color="rgba(15,23,31,0.18)",
-            marker_line_width=0.4,
+            marker_line_width=1.2,
             marker_opacity=base_opacity,
         ))
 
     fig.update_geos(
         projection_type="miller",
-        showcoastlines=True, coastlinecolor=COLORS["land_line"],
+        showcoastlines=True, coastlinecolor=COLORS["land_line"], coastlinewidth=1.2,
         showland=True,       landcolor=COLORS["land"],
         showocean=True,      oceancolor=COLORS["ocean"],
         showlakes=False,
-        showcountries=True, countrycolor="rgba(15,23,31,0.07)",
+        showcountries=True, countrycolor="rgba(15,23,31,0.07)", countrywidth=1.2,
         showframe=False,
         bgcolor="rgba(0,0,0,0)",
         lataxis_range=[-58, 85],
@@ -152,6 +152,7 @@ def build_map(year_data: pd.DataFrame, tapio_col: str = "tapio_class", fogged: b
             font=dict(family="Inter", color=COLORS["text"], size=12),
         ),
         dragmode="pan",
+        uirevision=True,
     )
 
     return fig
@@ -212,26 +213,26 @@ def render_legend_hud():
         for key, name, desc in items:
             light, dark = TAPIO_COLORSCALES[key]
             rows.append(f"""
-                <div style="display:flex; align-items:flex-start; gap:9px; margin-bottom:8px;">
-                    <div style="width:13px; height:30px; border-radius:3px; flex-shrink:0; margin-top:1px;
+                <div style="display:flex; align-items:flex-start; gap:6px; margin-bottom:6px;">
+                    <div style="width:10px; height:24px; border-radius:3px; flex-shrink:0; margin-top:1px;
                                 background:linear-gradient(to bottom, {dark}, {light});
                                 border:1px solid rgba(15,23,31,0.10);"></div>
                     <div>
-                        <div style="font-size:0.76rem; font-weight:600; color:{COLORS['text']};">{name}</div>
-                        <div style="font-size:0.66rem; color:{COLORS['text_dim']}; margin-top:1px; line-height:1.3;">{desc}</div>
+                        <div style="font-size:0.7rem; font-weight:600; color:{COLORS['text']}; line-height:1.2;">{name}</div>
+                        <div style="font-size:0.62rem; color:{COLORS['text_dim']}; margin-top:2px; line-height:1.2;">{desc}</div>
                     </div>
                 </div>
             """)
         rows_html.append(f"""
-            <div class="hud-label" style="margin-bottom:6px;">{section_title}</div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 10px; margin-bottom:10px;">
-                {''.join(cells)}
+            <div class="hud-label" style="margin-bottom:4px;">{section_title}</div>
+            <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:6px;">
+                {''.join(rows)}
             </div>
-            <hr class="hud-divider" style="margin:6px 0;">
+            <hr class="hud-divider" style="margin:4px 0;">
         """)
 
     st.html(f"""
-        <div style="padding:14px 16px 2px 16px;">
+        <div style="padding:10px 16px 2px 16px;">
         {''.join(rows_html)}
         </div>
     """)
@@ -269,13 +270,4 @@ def render_country_stat(year_data: pd.DataFrame, tapio_col: str, selected_year: 
             <hr class="hud-divider" style="margin:0 16px 8px 16px;">
         """)
 
-
-def render_data_table(year_data: pd.DataFrame, tapio_col: str, selected_year: int):
-    e_col = "tapio_E" if tapio_col == "tapio_class" else "tapio_E_5yr"
-    e_label = "Tapio E (annual)" if tapio_col == "tapio_class" else "Tapio E (5yr avg)"
-
-    with st.expander(f"Full country table — {selected_year}", icon=":material/table_rows:"):
-        display_df = year_data[["country", tapio_col, "gdp_pct_change", "ghg_pct_change", e_col]].copy()
-        display_df.columns = ["Country", "Decoupling status", "GDP % change", "GHG % change", e_label]
-        display_df["Decoupling status"] = display_df["Decoupling status"].astype(str).str.replace("_", " ").str.title()
-        st.dataframe(display_df.set_index("Country").dropna(how="all"), width="stretch")
+

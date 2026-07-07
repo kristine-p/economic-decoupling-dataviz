@@ -1,5 +1,6 @@
 import pandas as pd
 import plotly.graph_objects as go
+import streamlit as st
 
 from style import COLORS
 
@@ -60,22 +61,11 @@ def add_pm25_overlay(fig: go.Figure, regional_year_data: pd.DataFrame) -> go.Fig
             color=pm25_data["pm25_clamped"],
             colorscale=HAZE_COLORSCALE,
             cmin=0, cmax=CMAX,
-            showscale=True,
-            colorbar=dict(
-                title=dict(text="PM2.5<br>µg/m³", font=dict(size=11, color=COLORS["text_dim"], family="Inter")),
-                thickness=10,
-                len=0.34,
-                x=0.015, y=0.22,
-                xanchor="left",
-                tickfont=dict(size=10, color=COLORS["text_dim"], family="JetBrains Mono"),
-                outlinewidth=0,
-                bgcolor="rgba(0,0,0,0)",
-                tickvals=[0, WHO_THRESHOLD, 15, 25, 35],
-                ticktext=["0", "WHO 5", "15", "25", "35+"],
-            ),
+            showscale=False,
             line=dict(color="rgba(8,10,12,0.55)", width=0.6),
             opacity=0.92,
         ),
+        showlegend=False,
         name="Regional PM2.5",
         customdata=pm25_data[["region_name", "country", "pm25_ugm3"]].values,
         hovertemplate=(
@@ -87,3 +77,18 @@ def add_pm25_overlay(fig: go.Figure, regional_year_data: pd.DataFrame) -> go.Fig
     ))
 
     return fig
+
+def render_pm25_legend():
+    """Custom HTML legend for the PM2.5 overlay layer, rendered in the left HUD."""
+    gradient = ", ".join([f"{color} {pos*100}%" for pos, color in HAZE_COLORSCALE])
+    st.html(f"""
+        <div style="margin-top:24px;">
+            <div class="hud-label" style="margin-bottom:8px;">PM2.5 (µg/m³)</div>
+            <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.65rem; color:{{COLORS['text_dim']}}; margin-bottom:4px;">
+                <span>0</span>
+                <span>{WHO_THRESHOLD} (WHO guideline)</span>
+                <span>{CMAX}+</span>
+            </div>
+            <div style="height:12px; border-radius:4px; background:linear-gradient(to right, {gradient}); border:1px solid rgba(15,23,31,0.10);"></div>
+        </div>
+    """)

@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import streamlit as st
 
 from style import COLORS
 
@@ -14,9 +15,9 @@ from style import COLORS
 # one can have wildly different absolute "hot days" counts while both are
 # warming at a similar *relative* pace, which the absolute value obscures.
 METRIC_COLS = {
-    "Hot days":        "hot_days_proj_pct_change_1981_2010",
-    "Tropical nights": "trop_nights_proj_pct_change_1981_2010",
-    "Icing days":      "icing_days_proj_pct_change_1981_2010",
+    "Hot days":        "hot_days_proj_diff_1981_2010",
+    "Tropical nights": "trop_nights_proj_diff_1981_2010",
+    "Icing days":      "icing_days_proj_diff_1981_2010",
 }
 # the matching absolute projection, kept alongside for hover-tooltip context
 METRIC_ABS_COLS = {
@@ -30,9 +31,9 @@ METRIC_ABS_UNITS = {
     "Icing days":      "days/yr < 0°C",
 }
 METRIC_UNITS = {
-    "Hot days":        "% vs 1981–2010 avg",
-    "Tropical nights": "% vs 1981–2010 avg",
-    "Icing days":      "% vs 1981–2010 avg",
+    "Hot days":        "days/yr vs 1981–2010 avg",
+    "Tropical nights": "nights/yr vs 1981–2010 avg",
+    "Icing days":      "days/yr vs 1981–2010 avg",
 }
 
 SCENARIO_ORDER = ["PROJ_SSP126", "PROJ_SSP245", "PROJ_SSP370", "PROJ_SSP585"]
@@ -101,14 +102,15 @@ def _symmetric_range(*series, floor=5.0):
 # MAP
 # ─────────────────────────────────────────
 
-def build_single_map(df: pd.DataFrame, metric_col: str, abs_col: str | None = None) -> go.Figure:
+def build_single_map(df: pd.DataFrame, metric_col: str, abs_col: str | None = None, unit_label: str = "") -> go.Figure:
     df = df.dropna(subset=[metric_col]).copy()
     zmax = _symmetric_range(df[metric_col]) if len(df) else 5.0
 
     customdata_cols = ["country", metric_col] + ([abs_col] if abs_col and abs_col in df.columns else [])
-    hover = "<b>%{customdata[0]}</b><br>%{customdata[1]:+.1f}% vs 1981–2010"
+    hover = "<b>%{customdata[0]}</b><br>"
     if abs_col and abs_col in df.columns:
-        hover += "<br>projected: %{customdata[2]:.1f}"
+        hover += f"Projected future: %{{customdata[2]:.1f}} {unit_label}<br>"
+    hover += "Change vs historical baseline: %{customdata[1]:+.1f} days/yr"
     hover += "<extra></extra>"
 
     fig = go.Figure()
@@ -116,15 +118,9 @@ def build_single_map(df: pd.DataFrame, metric_col: str, abs_col: str | None = No
         locations=df["iso3"], z=df[metric_col],
         zmin=-zmax, zmax=zmax, zmid=0,
         colorscale=DIVERGING_SCALE,
-        showscale=True,
-        colorbar=dict(
-            thickness=10, len=0.4, x=0.0, y=0.22, xanchor="left",
-            ticksuffix="%",
-            tickfont=dict(size=10, color=COLORS["text_dim"], family="JetBrains Mono"),
-            outlinewidth=0, bgcolor="rgba(0,0,0,0)",
-        ),
+        showscale=False,
         marker_line_color="rgba(15,23,31,0.16)",
-        marker_line_width=0.4,
+        marker_line_width=1.2,
         customdata=df[customdata_cols].values,
         hovertemplate=hover,
     ))
@@ -133,77 +129,40 @@ def build_single_map(df: pd.DataFrame, metric_col: str, abs_col: str | None = No
                        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
     return fig
 
+def render_legend_hud(zmax: float):
+    """Custom HTML legend rendered inline inside the floating left HUD panel."""
+    # render a CSS gradient bar for the diverging scale
+    gradient = ", ".join([f"{color} {pos*100}%" for pos, color in DIVERGING_SCALE])
+    st.html(f"""
+        <div style="margin-top:24px;">
+            <div class="hud-label" style="margin-bottom:8px;">PROJECTION (days vs 1981–2010)</div>
+            <div style="display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace; font-size:0.65rem; color:{{COLORS['text_dim']}}; margin-bottom:4px;">
+                <span>{-zmax:.1f}</span>
+                <span>0</span>
+                <span>+{zmax:.1f}</span>
+            </div>
+            <div style="height:12px; border-radius:4px; background:linear-gradient(to right, {gradient}); border:1px solid rgba(15,23,31,0.10);"></div>
+        </div>
+    """)
 
-def build_compare_map(df_left: pd.DataFrame, df_right: pd.DataFrame, metric_col: str,
-                       label_left: str, label_right: str, abs_col: str | None = None) -> go.Figure:
-    df_left = df_left.dropna(subset=[metric_col]).copy()
-    df_right = df_right.dropna(subset=[metric_col]).copy()
 
-    fig = make_subplots(
-        rows=1, cols=2,
-        specs=[[{"type": "choropleth"}, {"type": "choropleth"}]],
-        subplot_titles=(label_left, label_right),
-        horizontal_spacing=0.02,
-    )
-    # shared, zero-centered color range across both panels for a fair
-    # visual comparison between the two scenarios
-    zmax = _symmetric_range(df_left[metric_col], df_right[metric_col])
 
-    customdata_cols = ["country", metric_col] + ([abs_col] if abs_col and abs_col in df_left.columns else [])
-    hover = "<b>%{customdata[0]}</b><br>%{customdata[1]:+.1f}% vs 1981–2010"
-    if abs_col and abs_col in df_left.columns:
-        hover += "<br>projected: %{customdata[2]:.1f}"
-    hover += "<extra></extra>"
-
-    for df, c in ((df_left, 1), (df_right, 2)):
-        fig.add_trace(
-            go.Choropleth(
-                locations=df["iso3"], z=df[metric_col],
-                zmin=-zmax, zmax=zmax, zmid=0,
-                colorscale=DIVERGING_SCALE,
-                showscale=(c == 2),
-                colorbar=dict(thickness=10, len=0.4, x=1.02, y=0.22,
-                               ticksuffix="%",
-                               tickfont=dict(size=10, color=COLORS["text_dim"], family="JetBrains Mono"),
-                               outlinewidth=0, bgcolor="rgba(0,0,0,0)"),
-                marker_line_color="rgba(15,23,31,0.16)", marker_line_width=0.4,
-                customdata=df[customdata_cols].values,
-                hovertemplate=hover,
-            ),
-            row=1, col=c,
-        )
-
-    geo_style = dict(
-        projection_type="miller",
-        showcoastlines=True, coastlinecolor=COLORS["land_line"],
-        showland=True, landcolor=COLORS["land"],
-        showocean=True, oceancolor=COLORS["ocean"],
-        showframe=False, bgcolor="rgba(0,0,0,0)",
-        lataxis_range=[-58, 85], lonaxis_range=[-180, 180],
-    )
-    fig.update_geos(geo_style)
-    fig.update_layout(
-        margin={"r": 0, "t": 28, "l": 0, "b": 0},
-        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family="Space Grotesk", color=COLORS["text_dim"], size=12),
-        hoverlabel=dict(bgcolor=COLORS["panel_solid"], bordercolor=COLORS["hairline"],
-                         font=dict(family="Inter", color=COLORS["text"], size=12)),
-    )
-    return fig
 
 
 def _style_geo(fig):
     fig.update_geos(
         projection_type="miller",
-        showcoastlines=True, coastlinecolor=COLORS["land_line"],
+        showcoastlines=True, coastlinecolor=COLORS["land_line"], coastlinewidth=1.2,
         showland=True, landcolor=COLORS["land"],
         showocean=True, oceancolor=COLORS["ocean"],
+        showcountries=True, countrycolor="rgba(15,23,31,0.07)", countrywidth=1.2,
         showframe=False, bgcolor="rgba(0,0,0,0)",
         lataxis_range=[-58, 85], lonaxis_range=[-180, 180],
     )
     fig.update_layout(
         hoverlabel=dict(bgcolor=COLORS["panel_solid"], bordercolor=COLORS["hairline"],
                          font=dict(family="Inter", color=COLORS["text"], size=12)),
+        uirevision=True,
     )
 
 
