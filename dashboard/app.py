@@ -180,16 +180,28 @@ else:
             selection_mode="points",
         )
 
-    # If the user clicked a country on the map, extract its iso3 code and
-    # resolve it to a country name, then store it in session_state so the
-    # selectbox below picks it up as its new value.
-    clicked_iso3 = None
-    if map_selection and map_selection.selection and map_selection.selection.points:
-        clicked_iso3 = map_selection.selection.points[0].get("location")
-        if clicked_iso3 and clicked_iso3 in iso3_to_country:
-            clicked_country = iso3_to_country[clicked_iso3]
-            if clicked_country in countries:
-                st.session_state["country_v3"] = clicked_country
+    # Handle map clicks and selection clearing
+    if map_selection and hasattr(map_selection, "selection"):
+        current_points = map_selection.selection.points
+        current_locations = [p.get("location") for p in current_points if "location" in p]
+        
+        last_locations = st.session_state.get("last_map_locations_v3", None)
+        if current_locations != last_locations:
+            # Map selection actually changed via user interaction
+            st.session_state["last_map_locations_v3"] = current_locations
+            if current_locations:
+                # User selected a specific country
+                clicked_iso3 = current_locations[0]
+                if clicked_iso3 in iso3_to_country:
+                    clicked_country = iso3_to_country[clicked_iso3]
+                    if clicked_country in countries:
+                        st.session_state["country_v3"] = clicked_country
+            else:
+                # User clicked empty space (ocean) clearing the selection.
+                # Only reset if we previously had a selection (not on initial load).
+                if last_locations is not None:
+                    if countries:
+                        st.session_state["country_v3"] = countries[0]
 
     # ---- right HUD panel: country deep-dive ----
     with st.container(key="sidepanel"):

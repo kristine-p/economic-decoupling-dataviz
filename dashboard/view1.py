@@ -175,7 +175,7 @@ def year_bounds(historical_df: pd.DataFrame, show_pm25: bool):
         min_year = max(2000, int(historical_df["year"].min()))
         max_year = min(2020, int(historical_df["year"].max()))
     else:
-        min_year = int(historical_df["year"].min())
+        min_year = max(1991, int(historical_df["year"].min()))
         max_year = int(historical_df["year"].max())
     return min_year, max_year
 

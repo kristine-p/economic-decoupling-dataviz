@@ -77,10 +77,11 @@ def inject_base_css():
    layout space entirely -- visibility:hidden was leaving a tall empty
    "banner" strip at the very top of the page, since Streamlit's header
    still occupied its normal box even though invisible. */
-#MainMenu, footer, header, [data-testid="stHeader"] {{
+#MainMenu, footer, header, [data-testid="stHeader"], [data-testid="stAppHeader"], .stAppHeader {{
     display: none !important;
     height: 0 !important;
     min-height: 0 !important;
+    background: transparent !important;
 }}
 [data-testid="stToolbar"] {{ display: none !important; }}
 [data-testid="stDecoration"] {{ display: none !important; }}
@@ -250,7 +251,9 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
    overflow:hidden (and making it transparent + unclickable) removes the strip
    while the actual fixed pill and brand are still rendered and interactive. */
 .st-key-topbar,
-.st-key-topbar > div[data-testid="stHorizontalBlock"],
+.st-key-topbar > div,
+.st-key-topbar [data-testid="stHorizontalBlock"],
+.st-key-topbar [data-testid="stVerticalBlock"],
 .st-key-topbar [data-testid="column"],
 .st-key-topbar [data-testid="stVerticalBlockBorderWrapper"] {{
     background: transparent !important;
@@ -264,7 +267,7 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 }}
 /* The stMainBlockContainer must also start at top:0 with no top-padding,
    otherwise the collapsed topbar row still pushes content down. */
-[data-testid="stMainBlockContainer"] {{
+[data-testid="stMainBlockContainer"], .block-container, [data-testid="stAppViewBlockContainer"] {{
     padding-top: 0 !important;
     margin-top: 0 !important;
 }}
