@@ -254,20 +254,6 @@ else:
             selection_mode="points",
         )
 
-<<<<<<< HEAD
-    # If the user clicked a country on the map, extract its iso3 code and
-    # resolve it to a country name, then store it in session_state so the
-    # selectbox below picks it up as its new value.
-    # Clicking the ocean produces an empty selection — reset to first country.
-    if map_selection and map_selection.selection is not None:
-        points = map_selection.selection.points if map_selection.selection.points else []
-        if points:
-            clicked_iso3 = points[0].get("location")
-            if clicked_iso3 and clicked_iso3 in iso3_to_country:
-                clicked_country = iso3_to_country[clicked_iso3]
-                if clicked_country in countries:
-                    st.session_state["country_v3"] = clicked_country
-=======
     # Handle map clicks and selection clearing
     if map_selection and hasattr(map_selection, "selection"):
         current_points = map_selection.selection.points
@@ -290,7 +276,6 @@ else:
                 if last_locations is not None:
                     if countries:
                         st.session_state["country_v3"] = countries[0]
->>>>>>> refs/remotes/origin/main
 
     # ---- right HUD panel: country deep-dive ----
     with st.container(key="sidepanel"):
