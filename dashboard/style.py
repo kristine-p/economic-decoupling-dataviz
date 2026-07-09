@@ -132,6 +132,18 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
     box-shadow: 0 6px 24px {COLORS['shadow']};
 }}
 
+/* Truncate long URLs in markdown tables inside dialogs so they don't stretch */
+div[data-testid="stDialog"] table td:last-child {{
+    max-width: 280px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}}
+div[data-testid="stDialog"] table a {{
+    text-decoration: none;
+    color: {COLORS['accent']};
+}}
+
 /* ---------- topbar ---------- */
 .st-key-topbar {{
     position: fixed;
