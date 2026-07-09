@@ -334,10 +334,14 @@ TAPIO_TO_SSP = {
     "undefined":                      "PROJ_SSP245",
 }
 
-# a baseline this small (day-count from the 1981-2010 average) makes a
-# percentage change explode or divide-by-zero without being meaningful --
-# mirrors the near-zero GDP growth guard used for the Tapio index above.
-BASELINE_EPS_DAYS = 1.0
+# Suppress pct-change only when the 1981-2010 historical baseline is truly
+# indistinguishable from zero (floating-point rounding artifact, e.g. a
+# country with literally zero hot days or zero icing days historically).
+# Using 1.0 was too aggressive: cold-climate countries often have a valid
+# but small baseline -- e.g. Austria's hot-days average is ~0.2 days/yr --
+# and were being silently dropped, causing them to show 'no baseline' in
+# view3.  0.01 keeps only the genuine divide-by-zero cases.
+BASELINE_EPS_DAYS = 0.01
 
 if not os.path.exists(CLIM_PATH):
     print(f"    Climate file not found at {CLIM_PATH}")
@@ -435,28 +439,51 @@ else:
 
     climate_wide["scenario_label"] = climate_wide["scenario"].map(SCENARIO_LABELS)
 
-    # Use the most recent *well-covered* year, not the literal max year --
-    # the panel's very last year is typically sparse (World Bank GDP data
-    # lags 1-2 years for many countries, per default_analysis_year() in
-    # view1.py), so anchoring to panel["year"].max() left most countries
-    # with tapio_class == NaN for that year, which produced linked_ssp = NaN
-    # and made is_linked_scenario False for ALL of that country's rows --
-    # silently hiding it from the entire "Current trajectory (linked)" view.
-    year_counts = panel.groupby("year").size()
-    coverage_threshold = year_counts.max() * 0.8
-    well_covered_years = year_counts[year_counts >= coverage_threshold].index
-    linked_reference_year = int(well_covered_years.max())
-    print(f"    Using {linked_reference_year} (well-covered year) to determine each "
-          f"country's linked SSP scenario, not the sparser {panel['year'].max()}")
-
-    tapio_latest = (
-        panel[panel["year"] == linked_reference_year]
-        [["iso3", "tapio_class"]]
-        .copy()
+    # Per-country tapio lookup: for each country use their own latest year in
+    # the panel, not a single global reference year.  A single global year
+    # fails for countries whose panel data ends before that year (e.g. CHN,
+    # COL, CRI, IND, PER whose GDP series ends at 2021), leaving them with
+    # linked_ssp = NaN and hiding them from the "Current trajectory" view.
+    #
+    # Strategy:
+    #   1. For each country keep only the rows where tapio_class is not
+    #      'undefined' (first-year NaN, near-zero GDP, genuine undefined).
+    #   2. From those, take the most recent year per country.
+    #   3. Fall back to any year (even 'undefined') if no non-undefined row
+    #      exists, so at least the country gets SOME linked_ssp.
+    panel_defined = panel[panel["tapio_class"] != "undefined"].copy()
+    tapio_per_country = (
+        panel_defined
+        .sort_values("year")
+        .groupby("iso3", as_index=False)
+        .last()[["iso3", "tapio_class"]]
     )
-    tapio_latest["linked_ssp"] = tapio_latest["tapio_class"].map(TAPIO_TO_SSP)
-    climate_wide = climate_wide.merge(tapio_latest[["iso3", "linked_ssp"]], on="iso3", how="left")
-    climate_wide["is_linked_scenario"] = (climate_wide["scenario"] == climate_wide["linked_ssp"])
+    # Fallback: countries where every year is 'undefined' -- use absolute
+    # latest year regardless
+    all_countries_latest = (
+        panel
+        .sort_values("year")
+        .groupby("iso3", as_index=False)
+        .last()[["iso3", "tapio_class"]]
+    )
+    tapio_per_country = pd.concat(
+        [tapio_per_country,
+         all_countries_latest[~all_countries_latest["iso3"].isin(tapio_per_country["iso3"])]],
+        ignore_index=True,
+    )
+
+    tapio_per_country["linked_ssp"] = tapio_per_country["tapio_class"].map(TAPIO_TO_SSP)
+    climate_wide = climate_wide.merge(
+        tapio_per_country[["iso3", "linked_ssp"]], on="iso3", how="left"
+    )
+    climate_wide["is_linked_scenario"] = (
+        climate_wide["linked_ssp"].notna() &
+        (climate_wide["scenario"] == climate_wide["linked_ssp"])
+    )
+
+    n_linked = climate_wide[climate_wide["is_linked_scenario"]].groupby("iso3").ngroups
+    print(f"    Per-country latest tapio used for linked SSP -- "
+          f"{n_linked}/{climate_wide['iso3'].nunique()} countries have a valid linked scenario")
 
     print(f"    Read {rows_read:,} total rows, kept {rows_kept:,} country-level rows")
     print(f"    Climate table: {len(climate_wide):,} rows | "

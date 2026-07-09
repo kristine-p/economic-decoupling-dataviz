@@ -128,7 +128,15 @@ if active_view == "Decoupling Map":
 # ═════════════════════════════════════════
 else:
     countries = sorted(projections_df["country"].dropna().unique().tolist())
-    default_country = countries[0] if countries else None
+
+    # ── build iso3 ↔ country lookup tables used by click handler ──
+    iso3_to_country = (
+        projections_df[["iso3", "country"]]
+        .drop_duplicates("iso3")
+        .set_index("iso3")["country"]
+        .to_dict()
+    )
+
     # ---- bottom timeline dock ----
     with st.container(key="timeline"):
         year3 = st.slider(
@@ -154,23 +162,45 @@ else:
         abs_col = view3.METRIC_ABS_COLS[metric_label]
         df_map = view3.slice_for_scenario(projections_df, year3, scenario_label)
         zmax = view3._symmetric_range(df_map[metric_col]) if len(df_map.dropna(subset=[metric_col])) else 5.0
-        
+
         view3.render_legend_hud(zmax)
 
     fig3 = view3.build_single_map(df_map, metric_col, abs_col=abs_col, unit_label=view3.METRIC_ABS_UNITS[metric_label])
     fig3.update_layout(height=1000)
 
+    # ── map with click-to-select ──────────────────────────────────────────
+    # on_select="rerun" makes Streamlit re-run the script whenever the user
+    # clicks a country; the return value carries the clicked iso3 code.
     with st.container(key="mapstage"):
-        st.plotly_chart(fig3, width="stretch", config={"displayModeBar": False, "scrollZoom": True}, key="map_v3")
+        map_selection = st.plotly_chart(
+            fig3, width="stretch",
+            config={"displayModeBar": False, "scrollZoom": True},
+            key="map_v3",
+            on_select="rerun",
+            selection_mode="points",
+        )
+
+    # If the user clicked a country on the map, extract its iso3 code and
+    # resolve it to a country name, then store it in session_state so the
+    # selectbox below picks it up as its new value.
+    clicked_iso3 = None
+    if map_selection and map_selection.selection and map_selection.selection.points:
+        clicked_iso3 = map_selection.selection.points[0].get("location")
+        if clicked_iso3 and clicked_iso3 in iso3_to_country:
+            clicked_country = iso3_to_country[clicked_iso3]
+            if clicked_country in countries:
+                st.session_state["country_v3"] = clicked_country
 
     # ---- right HUD panel: country deep-dive ----
     with st.container(key="sidepanel"):
         st.html('<div style="padding:14px 16px 6px 16px;" class="hud-label">COUNTRY TRAJECTORY</div>')
 
         with st.container(key="country_select_wrap"):
+            # The selectbox value is driven by session_state["country_v3"];
+            # clicking the map updates that key before this widget renders,
+            # so the dropdown and the trend chart always stay in sync.
             sel_country = st.selectbox(
                 "Country", countries,
-                index=countries.index(default_country) if default_country in countries else 0,
                 key="country_v3", label_visibility="collapsed",
             )
 
@@ -190,9 +220,10 @@ else:
 
         st.html(f"""
 <div style="padding:0 16px 14px 16px; font-size:0.68rem; color:{COLORS['text_faint']}; line-height:1.4;">
-    The solid line is the scenario linked to {sel_country}'s current decoupling
-    trajectory — its most representative future pathway given present-day
-    Tapio elasticity. Dotted lines show the three alternative SSP pathways.
+    Click any country on the map to explore its trajectory, or use the
+    dropdown above. The solid line is the scenario linked to {sel_country}'s
+    current decoupling trajectory. Dotted lines show the three alternative
+    SSP pathways.
 </div>
 """)
     pin_sidepanel_scroll()

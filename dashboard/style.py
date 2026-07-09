@@ -243,6 +243,31 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 }}
 
 /* ---------- fullbleed map holder ---------- */
+/* The .st-key-topbar container is position:fixed so the map truly fills the
+   viewport. But Streamlit still renders the topbar's columns inside a normal
+   stHorizontalBlock div that sits in block flow, creating the visible beige
+   strip at the top of the page.  Collapsing it to zero height with
+   overflow:hidden (and making it transparent + unclickable) removes the strip
+   while the actual fixed pill and brand are still rendered and interactive. */
+.st-key-topbar,
+.st-key-topbar > div[data-testid="stHorizontalBlock"],
+.st-key-topbar [data-testid="column"],
+.st-key-topbar [data-testid="stVerticalBlockBorderWrapper"] {{
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}}
+/* The stMainBlockContainer must also start at top:0 with no top-padding,
+   otherwise the collapsed topbar row still pushes content down. */
+[data-testid="stMainBlockContainer"] {{
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+}}
 .st-key-mapstage {{ position: fixed; inset: 0; z-index: 1; }}
 
 /* ---------- generic HUD typography ---------- */
@@ -258,12 +283,9 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 
 /* sliders */
 div[data-testid="stSlider"] [data-baseweb="slider"] div[role="slider"] {{
-    background-color: {COLORS['accent']} !important;
     box-shadow: 0 0 0 4px {COLORS['accent_dim']};
 }}
 div[data-testid="stSlider"] div[data-testid="stTickBar"] {{ display:none; }}
-div[data-baseweb="slider"] > div > div {{ background: {COLORS['accent']} !important; }}
-div[data-baseweb="slider"] > div {{ background: rgba(15,23,31,0.12) !important; }}
 
 /* toggle switch */
 div[data-testid="stToggle"] label div[data-checked="true"] {{ background-color: {COLORS['accent']} !important; }}
