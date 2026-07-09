@@ -142,6 +142,12 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
     pointer-events: none;
 }}
 .st-key-topbar > div {{ pointer-events: auto; }}
+/* Remove the grey background that Streamlit's border-wrapper adds */
+.st-key-topbar > div > div[data-testid="stVerticalBlockBorderWrapper"] {{
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}}
 .brand-wrap {{
     border-radius: var(--radius);
     padding: 10px 18px;
@@ -166,12 +172,18 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 }}
 
 .st-key-navpill_align {{ display: flex; justify-content: center; }}
+.st-key-navpill {{ pointer-events: auto; }}
 
 .st-key-navpill div[role="radiogroup"] {{
     border-radius: 999px;
     padding: 5px;
     display: flex;
     gap: 2px;
+    background: {COLORS['panel']} !important;
+    backdrop-filter: blur(18px) saturate(140%) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+    border: 1px solid {COLORS['panel_border']} !important;
+    box-shadow: 0 6px 24px {COLORS['shadow']} !important;
 }}
 .st-key-navpill label {{
     border-radius: 999px !important;
@@ -190,6 +202,51 @@ div[data-testid="element-container"] {{ margin: 0 !important; }}
 .st-key-navpill label:has(input:checked) p {{ color: {COLORS['accent']} !important; }}
 .st-key-navpill [data-baseweb="radio"] > div:first-child {{ display: none; }}
 
+/* ---------- info button ---------- */
+.st-key-info_btn_wrap {{
+    position: fixed !important;
+    bottom: var(--gap);
+    left: var(--gap);
+    z-index: 9999;
+    width: auto !important;
+    height: auto !important;
+    pointer-events: auto;
+}}
+/* Collapse all Streamlit wrapper noise inside the button container */
+.st-key-info_btn_wrap div[data-testid="stVerticalBlockBorderWrapper"],
+.st-key-info_btn_wrap div[data-testid="stVerticalBlock"],
+.st-key-info_btn_wrap div[data-testid="element-container"] {{
+    position: static !important;
+    width: auto !important;
+    height: auto !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}}
+.st-key-info_btn button {{
+    width: 36px !important;
+    height: 36px !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    border-radius: 50% !important;
+    background: {COLORS['panel']} !important;
+    border: 1px solid {COLORS['panel_border']} !important;
+    box-shadow: 0 4px 16px {COLORS['shadow']} !important;
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    font-size: 1.1rem !important;
+    line-height: 1 !important;
+    color: {COLORS['text_dim']} !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}}
+.st-key-info_btn button:hover {{
+    background: {COLORS['accent_dim']} !important;
+    color: {COLORS['accent']} !important;
+    box-shadow: 0 6px 24px {COLORS['shadow']} !important;
+}}
 /* ---------- right HUD panel ---------- */
 .st-key-sidepanel {{
     position: fixed;

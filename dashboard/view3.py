@@ -198,12 +198,16 @@ def build_trend_chart(climate_df: pd.DataFrame, iso3: str, metric_col: str) -> g
         ))
 
     fig.update_layout(
-        margin={"r": 8, "t": 8, "l": 8, "b": 8},
-        height=190,
+        margin={"r": 8, "t": 8, "l": 8, "b": 80},
+        height=250,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
         font=dict(family="Inter", size=10, color=COLORS["text_dim"]),
-        legend=dict(orientation="h", yanchor="bottom", y=-0.55, x=0, font=dict(size=9)),
+        legend=dict(
+            orientation="h", yanchor="top", y=-0.35, x=0, xanchor="left",
+            font=dict(size=8),
+            tracegroupgap=2,
+        ),
         xaxis=dict(showgrid=False, tickfont=dict(size=9)),
         yaxis=dict(showgrid=True, gridcolor="rgba(15,23,31,0.08)", tickfont=dict(size=9), ticksuffix="%"),
         hoverlabel=dict(bgcolor=COLORS["panel_solid"], bordercolor=COLORS["hairline"],

@@ -47,6 +47,80 @@ historical_df, projections_df, regions_df = load_data()
 st.session_state.setdefault("active_view", "Decoupling Map")
 
 # ─────────────────────────────────────────
+# INFO DIALOG
+# ─────────────────────────────────────────
+@st.dialog("About This Dashboard", width="large")
+def show_info_dialog():
+    st.markdown(f"""
+### Key Terms
+
+| Abbreviation | Meaning |
+|---|---|
+| **GDP** | **Gross Domestic Product** — the total monetary value of all goods and services produced within a country in a given year. Used here as the primary indicator of economic growth. |
+| **GHG** | **Greenhouse Gas Emissions** — the total CO₂-equivalent emissions produced by a country, covering carbon dioxide, methane, nitrous oxide, and fluorinated gases. |
+
+---
+
+### The Tapio Decoupling Index
+
+The **Tapio elasticity index** measures the relationship between economic growth and emissions growth. It is calculated as:
+
+$$E = \\frac{{\\%\\Delta GHG}}{{\\%\\Delta GDP}}$$
+
+Where **%ΔGHG** is the percentage change in greenhouse gas emissions and **%ΔGDP** is the percentage change in GDP over the same period.
+
+Based on the value of **E**, countries are classified into one of seven decoupling states:
+
+| State | Condition | Meaning |
+|---|---|---|
+| **Absolute decoupling** | GDP ↑, GHG ↓ | The best case — growth with falling emissions |
+| **Relative decoupling** | GDP ↑, GHG ↑ slower than GDP | Emissions still rising, but slower than growth |
+| **Expansive coupling** | GDP ↑, GHG ↑ at the same rate | No progress — emissions track growth 1:1 |
+| **Expansive negative decoupling** | GDP ↑, GHG ↑ faster than GDP | Worst growing case — emissions outpace growth |
+| **Recessive decoupling** | GDP ↓, GHG ↓ even faster | Emissions falling, but so is the economy |
+| **Recessive coupling** | GDP ↓, GHG ↓ at the same rate | Both declining together |
+| **Strong negative decoupling** | GDP ↓, GHG ↑ | The worst case — shrinking economy, rising emissions |
+
+The **5-year rolling average** option smooths annual volatility to reveal longer-term structural trends.
+
+---
+
+### Future Scenarios (Climate Projections)
+
+The **Future Scenarios** view shows projected changes in extreme weather indicators (hot days, tropical nights, icing days) under different **SSP** (Shared Socioeconomic Pathway) scenarios:
+
+- **SSP1-2.6** — Sustainability pathway (low emissions)
+- **SSP2-4.5** — Middle of the road
+- **SSP3-7.0** — Regional rivalry (high emissions)
+- **SSP5-8.5** — Fossil-fueled development (very high emissions)
+
+Values show the **absolute difference** in days/year compared to the 1981–2010 historical baseline.
+
+---
+
+### Contact
+
+| Name | Email | GitHub |
+|---|---|---|
+| *Kristine Paegle* | *kristine.paegle@studenti.unitn.it* | https://github.com/kristine-p |
+| *Giuseppe Pio Mangiacotti* | *giuseppe.mangiacotti@studenti.unitn.it* | https://github.com/givmangi |
+| *Martin Krisak* | *martin.krisak@studenti.unitn.it* | https://github.com/martin-kri |
+
+---
+
+### Datasets
+
+| Source | Dataset | Link |
+|---|---|---|
+| **OECD** | Air and GHG Emissions | https://data-explorer.oecd.org/vis?lc=en&tm=%22Air%20emissions%20-%20Greenhouse%20gas%20emissions%20Inventories%22&pg=0&snb=1&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_AIR_GHG%40DF_AIR_GHG&df[ag]=OECD.ENV.EPI&df[vs]=1.0&dq=.A.GHG._T.KG_CO2E_PS&pd=2014,&to[TIME_PERIOD]=false |
+| **World Bank** | GDP per capita, PPP | https://data.worldbank.org/indicator/NY.GDP.PCAP.PP.CD |
+| **OECD** | Exposure to Air Pollution | https://data-explorer.oecd.org/vis?tm=DF_AIR_POLL&pg=0&snb=1&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_AIR_POL%40DF_AIR_POLL&df[ag]=OECD.ENV.EPI&df[vs]=&pd=%2C&dq=.A.MEAN_POP....&to[TIME_PERIOD]=false |
+| **OECD** | Climate Projections | https://data-explorer.oecd.org/vis?lc=en&df[ds]=dsDisseminateFinalDMZ&df[id]=DSD_REG_CLIM%40DF_CLIM_PROJ&df[ag]=OECD.CFE.EDS&dq=A.CTRY.BEL%2BCAN%2BCHL%2BCOL%2BCRI%2BCZE%2BDNK%2BEST%2BFIN%2BFRA%2BDEU%2BGRC%2BHUN%2BISL%2BIRL%2BISR%2BITA%2BJPN%2BKOR%2BLVA%2BLTU%2BLUX%2BMEX%2BNLD%2BNZL%2BNOR%2BPOL%2BPRT%2BSVK%2BSVN%2BESP%2BSWE%2BCHE%2BTUR%2BGBR%2BUSA%2BAUS%2BAUT..HOT_DAYS_PROJ...PROJ_SSP585%2BPROJ_SSP370%2BPROJ_SSP245%2BPROJ_SSP126..D_Y&pd=2030%2C2060&to[TIME_PERIOD]=false&vw=ov |
+
+""")
+    st.caption("Built with Streamlit · Data sources: World Bank, OECD")
+
+# ─────────────────────────────────────────
 # TOP BAR — brand + pill nav
 # ─────────────────────────────────────────
 with st.container(key="topbar"):
@@ -183,13 +257,15 @@ else:
     # If the user clicked a country on the map, extract its iso3 code and
     # resolve it to a country name, then store it in session_state so the
     # selectbox below picks it up as its new value.
-    clicked_iso3 = None
-    if map_selection and map_selection.selection and map_selection.selection.points:
-        clicked_iso3 = map_selection.selection.points[0].get("location")
-        if clicked_iso3 and clicked_iso3 in iso3_to_country:
-            clicked_country = iso3_to_country[clicked_iso3]
-            if clicked_country in countries:
-                st.session_state["country_v3"] = clicked_country
+    # Clicking the ocean produces an empty selection — reset to first country.
+    if map_selection and map_selection.selection is not None:
+        points = map_selection.selection.points if map_selection.selection.points else []
+        if points:
+            clicked_iso3 = points[0].get("location")
+            if clicked_iso3 and clicked_iso3 in iso3_to_country:
+                clicked_country = iso3_to_country[clicked_iso3]
+                if clicked_country in countries:
+                    st.session_state["country_v3"] = clicked_country
 
     # ---- right HUD panel: country deep-dive ----
     with st.container(key="sidepanel"):
@@ -227,3 +303,10 @@ else:
 </div>
 """)
     pin_sidepanel_scroll()
+
+# ─────────────────────────────────────────
+# FLOATING INFO BUTTON (bottom-left)
+# ─────────────────────────────────────────
+with st.container(key="info_btn_wrap"):
+    if st.button("ℹ", key="info_btn", help="About this dashboard"):
+        show_info_dialog()
