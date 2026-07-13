@@ -17,7 +17,7 @@ The dashboard has two views, selectable from the top navigation bar:
 
 | View | Script | Description |
 |------|--------|-------------|
-| **Decoupling Map** | `view1.py` | World map coloured by Tapio decoupling status, with per-country gradient based on the actual elasticity value. Toggle between annual and 5-year rolling average to smooth COVID-2020 noise. |
+| **Decoupling Map** | `view1.py` | World map coloured by Tapio decoupling status, with per-country gradient based on the actual elasticity value. Toggle between annual and 5-year rolling average to smooth short-term shocks — such as the COVID-2020 disruption — and reveal underlying long-term trends. |
 | **Air Quality Layer** | `view2.py` | Optional layer toggled within the Decoupling Map. Overlays sub-national PM2.5 concentration bubbles (723 regions across 52 countries) sized and coloured on a clean-to-hazardous scale. Dims the underlying choropleth while active. |
 | **Future Scenarios** | `view3.py` | Forward-looking view linking each country's current decoupling trajectory to an SSP climate scenario, showing projected change in hot days, tropical nights, and icing days relative to the 1981–2010 baseline, out to 2060. Click any country to explore all four SSP pathways. |
 
