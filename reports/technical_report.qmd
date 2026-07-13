@@ -17,6 +17,7 @@ format:
           \usepackage{textcomp}
           \usepackage{mathptmx}
           \usepackage{amsmath}
+          \usepackage{booktabs}
           \setkomafont{disposition}{\normalfont\bfseries}
           \RedeclareSectionCommand[beforeskip=0.6\baselineskip,afterskip=0.3\baselineskip]{section}
           \RedeclareSectionCommand[beforeskip=0.4\baselineskip,afterskip=0.2\baselineskip]{subsection}
@@ -66,7 +67,7 @@ To obtain a clean, unambiguous time series suitable for the Tapio Index calculat
 - `UNIT_MEASURE = "T_CO2E"` — tonnes of CO$_2$-equivalent
 - `POLLUTANT = "GHG"` — all greenhouse gases (excluding CO$_2$-only rows which would create duplicate country-year pairs)
 
-These filters reduce the dataset to approximately 2,500 rows covering 94 entities. After excluding aggregate codes (OECD, EU27_2020, OECDA, OECDE, OECDSO), **47 individual countries** remain. Of these, **37 countries** have complete data for the full 2000–2023 period.
+These filters reduce the dataset to approximately 2,500 rows covering 94 entities. After excluding aggregate codes (OECD, EU27_2020, OECDA, OECDE, OECDSO), **94 individual countries** remain.
 
 ### Data Quality
 
@@ -87,11 +88,6 @@ These filters reduce the dataset to approximately 2,500 rows covering 94 entitie
 ### Structure and Variables
 
 Unlike the OECD datasets, the World Bank provides this data in **wide format**, with each year as a separate column header. The file must be melted into long format during preprocessing.
-
-| Variable | Description |
-|----------|-------------|
-| `Country Code` | ISO-3 country code (primary key) |
-| `1960, 1961, ...` | GDP per capita PPP value for each year |
 
 ### Filtering and Transformation
 
@@ -134,9 +130,9 @@ We selected the mean concentration measure as it provides an objective, continuo
 
 ### Sub-national Region Level (PM2.5 Bubbles Layer)
 
-The same OECD PM2.5 file also encodes sub-national regional data alongside country aggregates. The distinction is structural: rows where `REF_AREA` equals `ISO` represent the country aggregate, while rows where `REF_AREA` differs from `ISO` represent a sub-national region (e.g. `FR1` for Île-de-France, parent country `FRA`). Previous versions of the pipeline silently dropped these region rows; version 4 retains them as a separate output.
+The same OECD PM2.5 file also encodes sub-national regional data alongside country aggregates. The distinction is structural: rows where `REF_AREA` equals `ISO` represent the country aggregate, while rows where `REF_AREA` differs from `ISO` represent a sub-national region (e.g. `FR1` for Île-de-France, parent country `FRA`). Previous versions of the pipeline silently dropped these region rows; the current version retains them as a separate output.
 
-The motivation for extracting regional data is visualisation quality: plotting a single bubble per country at its geographic centroid produces a sparse, coarse-grained air quality map. Regional bubbles, by contrast, expose intra-country variation — the contrast between heavily industrialised and rural areas within the same country — which is invisible at country level and directly relevant to the health dimension of the decoupling narrative.
+Regional bubbles expose intra-country variation invisible at country level — the contrast between heavily industrialised and rural areas — which is directly relevant to the health dimension of the decoupling narrative.
 
 The region-level output (`pm25_regions.csv`) contains **16,629 rows** across **723 sub-national regions** in **52 countries**, covering 1990–2020. It shares the same dual filter (`MEAN_POP` + `_Z`) as the country-level table, and a 5-year rolling mean (`pm25_ugm3_5yr`) is computed at region level using the same `min_periods=3` window applied to the country panel.
 
@@ -172,17 +168,20 @@ To avoid losing progress during long runs, the geocoder saves results incrementa
 **Source:** OECD Data Explorer — Climate Projections (`DSD_REG_CLIM@DF_CLIM_PROJ`)  
 **Format:** CSV (~1.5 GB uncompressed)  
 **Time range:** 2030–2060  
-**Countries:** 38 OECD members  
+**Countries:** 52  
 
 ### Structure and Variables
 
-This dataset provides projections of three climate indicators under four SSP scenarios:
+This dataset provides projections of three climate indicators under four SSP scenarios. The pipeline derives two additional columns per metric from the source file: the absolute difference versus the 1981–2010 historical baseline (`_diff_1981_2010`) and the percentage change versus that baseline (`_pct_change_1981_2010`). The dashboard's choropleth map displays the difference columns; the country trend chart displays percentage change:
 
-| Measure | Description |
-|:-|:---|
-| `HOT_DAYS_PROJ` | Projected number of days per year where max temperature > 35°C |
-| `TROP_NIGHTS_PROJ` | Projected number of nights per year where min temperature > 20°C |
-| `ICING_DAYS_PROJ` | Projected number of days per year where max temperature < 0°C |
+| Variable | Description |
+|:--|:----|
+| `hot_days_proj` | Projected days/year where max temperature > 35°C |
+| `hot_days_proj_diff_1981_2010` | Change vs. 1981–2010 baseline (days/year) — used in map |
+| `trop_nights_proj` | Projected nights/year where min temperature > 20°C |
+| `trop_nights_proj_diff_1981_2010` | Change vs. 1981–2010 baseline (nights/year) — used in map |
+| `icing_days_proj` | Projected days/year where max temperature < 0°C |
+| `icing_days_proj_diff_1981_2010` | Change vs. 1981–2010 baseline (days/year) — used in map |
 
 The four scenarios covered are:
 
@@ -197,23 +196,26 @@ The four scenarios covered are:
 
 A key design decision in this project is linking each country's current Tapio Decoupling classification to a corresponding SSP scenario, creating a narrative bridge between present economic behaviour and projected future climate:
 
-| Tapio Classification | Assigned SSP Scenario |
-|---------------------|-----------------------|
-| Absolute Decoupling | SSP1-2.6 (best case) |
-| Relative Decoupling | SSP2-4.5 |
-| Recessive Decoupling | SSP2-4.5 |
-| Expansive Coupling | SSP3-7.0 |
-| Recessive Coupling | SSP3-7.0 |
-| Expansive Negative Decoupling | SSP5-8.5 (worst case) |
-| Strong Negative Decoupling | SSP5-8.5 (worst case) |
+\begin{center}
+\begin{tabular}{ll@{\hspace{1.5cm}}ll}
+\toprule
+\textbf{Tapio Classification} & \textbf{SSP} & \textbf{Tapio Classification} & \textbf{SSP} \\
+\midrule
+Absolute Decoupling & SSP1-2.6 & Expansive Coupling & SSP3-7.0 \\
+Relative Decoupling & SSP2-4.5 & Recessive Coupling & SSP3-7.0 \\
+Recessive Decoupling & SSP2-4.5 & Expansive Negative Decoupling & SSP5-8.5 \\
+ & & Strong Negative Decoupling & SSP5-8.5 \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 The linked SSP for each country is determined from its most recent year with a non-undefined Tapio classification, rather than a single global reference year. This avoids leaving out countries whose GDP series ends before the panel's latest year (e.g. China, Colombia, Costa Rica), ensuring every country in the climate dataset receives a linked scenario. A fallback to any available year is applied for countries where all years are classified as undefined. This mapping allows the Future Scenarios view of the dashboard to show users: "if your country continues on its current trajectory, here is what the climate could look like by 2050."
 
 ### Data Quality
 
 - **File size:** At ~1.5 GB, this file cannot be processed in a single pandas read. It is read in chunks of 100,000 rows and filtered progressively
-- **Missing values:** None — zero values are legitimate and indicate no projected hot days, tropical nights, or icing days for that country-scenario combination
-- **Coverage limitation:** Only 38 OECD countries are covered, meaning the Future Scenarios view will display grey for non-OECD countries
+- **Missing values:** The absolute projection values and difference columns are complete for all 52 countries. The percentage change columns (`_pct_change_1981_2010`) are undefined for countries whose 1981–2010 baseline is near zero (within ${\pm}0.01$ days), affecting approximately 24% of countries for hot days and icing days and 2% for tropical nights — typically countries where those weather events are historically absent
+- **Coverage limitation:** Only 52 countries are covered, meaning the Future Scenarios view will have incomplete global coverage for countries outside the climate dataset
 - **Encoding issues:** Same UTF-8 encoding problems as the GHG dataset for `Türkiye` and `China (People's Republic of)`
 - **Column redundancy:** 24 out of 36 columns are irrelevant metadata and are dropped during preprocessing
 
@@ -230,7 +232,7 @@ The primary output, `merged_panel.csv`, is built by joining datasets using `(iso
 2. Result ← left join with **GHG per capita** (tooltip layer)
 3. Result ← left join with **PM2.5 country-level** (2021–2023 will be NaN by design)
 
-The final panel covers **42 countries** and **34 years** (1990–2023), yielding approximately 1,400 rows.
+The final panel covers **90 countries** and **34 years** (1990–2023), yielding **2,420 rows**.
 
 A second output, `pm25_regions.csv`, is produced independently from the sub-national branch of the PM2.5 source file (see Section 2.3). It is not merged into the main panel — instead it is loaded separately by the dashboard and enriched with geographic coordinates via the geocoding step described above, producing `pm25_regions_geocoded.csv` as the final input to the PM2.5 bubble layer.
 
@@ -244,22 +246,23 @@ Where $\Delta\%$ denotes the year-over-year percentage change. The index is left
 
 A **5-year rolling mean** of E is also computed to smooth COVID-2020 outliers and other short-term shocks, providing a more stable signal for the choropleth map. Countries are then classified into Tapio's 8-category typology:
 
-| Category | Condition |
-|----------|-----------|
-| Absolute Decoupling | GDP$\uparrow$, E $\leq$ 0 |
-| Relative Decoupling | GDP$\uparrow$, 0 < E < 0.8 |
-| Expansive Coupling | GDP$\uparrow$, 0.8 $\leq$ E < 1.2 |
-| Expansive Negative Decoupling | GDP$\uparrow$, E $\geq$ 1.2 |
-| Recessive Decoupling | GDP$\downarrow$, E > 1.2 |
-| Recessive Coupling | GDP$\downarrow$, 0 < E $\leq$ 1.2 |
-| Strong Negative Decoupling | GDP$\downarrow$, E $\leq$ 0 |
-| Undefined | Near-zero GDP growth or missing data |
+\begin{center}
+\begin{tabular}{ll@{\hspace{1cm}}ll}
+\toprule
+\textbf{Category} & \textbf{Condition} & \textbf{Category} & \textbf{Condition} \\
+\midrule
+Absolute Decoupling & GDP$\uparrow$, E $\leq$ 0 & Recessive Decoupling & GDP$\downarrow$, E > 1.2 \\
+Relative Decoupling & GDP$\uparrow$, 0 < E < 0.8 & Recessive Coupling & GDP$\downarrow$, 0 < E $\leq$ 1.2 \\
+Expansive Coupling & GDP$\uparrow$, 0.8 $\leq$ E < 1.2 & Strong Negative Decoupling & GDP$\downarrow$, E $\leq$ 0 \\
+Expansive Negative Decoupling & GDP$\uparrow$, E $\geq$ 1.2 & Undefined & Near-zero GDP growth \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 ## Known Limitations
 
 - **PM2.5 gap (2021–2023):** No PM2.5 data is available for recent years. The dashboard restricts the air quality view to 2000–2020 and notes this limitation explicitly
-- **Country coverage asymmetry:** The climate projections dataset covers only 38 OECD countries, while the historical panel covers 42. This means the Future Scenarios view will have incomplete global coverage
-- **COVID-2020 distortion:** The 2020 year shows extreme Tapio values for most countries due to simultaneous GDP and emissions collapses. The 5-year rolling average mitigates this but annual view will still show anomalies
+- **Country coverage asymmetry:** The climate projections dataset covers 52 countries, while the historical panel covers 90. This means the Future Scenarios view will have incomplete global coverage for countries outside the climate dataset
 - **GHG per capita vs total:** The Tapio Index is calculated using **total** GHG emissions (not per capita), as the decoupling relationship is between aggregate economic output and aggregate environmental pressure. Per capita figures are retained as a tooltip layer only
 - **Interpolation:** Linear interpolation is applied within country groups to fill internal gaps in the PM2.5 and GDP series, which may introduce slight inaccuracies for countries with extended missing periods
 - **Region centroid approximation:** Sub-national PM2.5 bubble positions are based on Nominatim administrative centroids rather than population-weighted centroids. For large or unevenly populated regions, the bubble may appear displaced relative to where most of the exposed population lives
@@ -297,7 +300,7 @@ Figure 4 shows PM2.5 exposure trends for a selection of countries. Western natio
 
 The four datasets used in this project are of generally high quality and well-suited for the intended visualization. The primary challenges encountered were encoding inconsistencies in country names, the 11-row-per-country-year structure of the PM2.5 dataset requiring careful filtering, and the large file size of the climate projections dataset requiring chunk-based processing. All issues have been addressed in the preprocessing pipeline (`panel.py`), which is fully reproducible and documented in the project repository.
 
-The merged panel of 42 countries across 34 years provides sufficient coverage to tell a compelling global story about economic decoupling, with the climate projections adding a forward-looking narrative dimension that connects present behaviour to future consequences.
+The merged panel of 90 countries across 34 years provides sufficient coverage to tell a compelling global story about economic decoupling, with the climate projections adding a forward-looking narrative dimension that connects present behaviour to future consequences.
 
 
 *Report prepared as Deliverable 2 for the Data Visualization course.*  

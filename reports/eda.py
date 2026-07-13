@@ -151,7 +151,7 @@ ax.set_title("Tapio Classification Distribution Across Countries (1991–2023)",
              fontsize=12, fontweight="bold", pad=12)
 ax.set_xlabel("Year", fontsize=10)
 ax.set_ylabel("Number of Countries", fontsize=10)
-ax.tick_params(axis="x", rotation=45, labelsize=8)
+ax.tick_params(axis="x", rotation=0, labelsize=8)
 
 # Highlight COVID year
 ax.axvline(x=2020, color="#888", linestyle="--", linewidth=1, alpha=0.7)
