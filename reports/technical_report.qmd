@@ -201,16 +201,19 @@ A key design decision in this project is linking each country's current Tapio De
 |---------------------|-----------------------|
 | Absolute Decoupling | SSP1-2.6 (best case) |
 | Relative Decoupling | SSP2-4.5 |
+| Recessive Decoupling | SSP2-4.5 |
 | Expansive Coupling | SSP3-7.0 |
-| Expansive/Strong Negative Decoupling | SSP5-8.5 (worst case) |
+| Recessive Coupling | SSP3-7.0 |
+| Expansive Negative Decoupling | SSP5-8.5 (worst case) |
+| Strong Negative Decoupling | SSP5-8.5 (worst case) |
 
-This mapping allows View 3 of the dashboard to show users: *"if your country continues on its current trajectory, here is what the climate could look like by 2050."*
+The linked SSP for each country is determined from its most recent year with a non-undefined Tapio classification, rather than a single global reference year. This avoids leaving out countries whose GDP series ends before the panel's latest year (e.g. China, Colombia, Costa Rica), ensuring every country in the climate dataset receives a linked scenario. A fallback to any available year is applied for countries where all years are classified as undefined. This mapping allows the Future Scenarios view of the dashboard to show users: "if your country continues on its current trajectory, here is what the climate could look like by 2050."
 
 ### Data Quality
 
 - **File size:** At ~1.5 GB, this file cannot be processed in a single pandas read. It is read in chunks of 100,000 rows and filtered progressively
 - **Missing values:** None — zero values are legitimate and indicate no projected hot days, tropical nights, or icing days for that country-scenario combination
-- **Coverage limitation:** Only 38 OECD countries are covered, meaning View 3 of the dashboard will display grey for non-OECD countries
+- **Coverage limitation:** Only 38 OECD countries are covered, meaning the Future Scenarios view will display grey for non-OECD countries
 - **Encoding issues:** Same UTF-8 encoding problems as the GHG dataset for `Türkiye` and `China (People's Republic of)`
 - **Column redundancy:** 24 out of 36 columns are irrelevant metadata and are dropped during preprocessing
 
@@ -255,7 +258,7 @@ A **5-year rolling mean** of E is also computed to smooth COVID-2020 outliers an
 ## Known Limitations
 
 - **PM2.5 gap (2021–2023):** No PM2.5 data is available for recent years. The dashboard restricts the air quality view to 2000–2020 and notes this limitation explicitly
-- **Country coverage asymmetry:** The climate projections dataset covers only 38 OECD countries, while the historical panel covers 42. This means View 3 will have incomplete global coverage
+- **Country coverage asymmetry:** The climate projections dataset covers only 38 OECD countries, while the historical panel covers 42. This means the Future Scenarios view will have incomplete global coverage
 - **COVID-2020 distortion:** The 2020 year shows extreme Tapio values for most countries due to simultaneous GDP and emissions collapses. The 5-year rolling average mitigates this but annual view will still show anomalies
 - **GHG per capita vs total:** The Tapio Index is calculated using **total** GHG emissions (not per capita), as the decoupling relationship is between aggregate economic output and aggregate environmental pressure. Per capita figures are retained as a tooltip layer only
 - **Interpolation:** Linear interpolation is applied within country groups to fill internal gaps in the PM2.5 and GDP series, which may introduce slight inaccuracies for countries with extended missing periods
@@ -267,7 +270,7 @@ A **5-year rolling mean** of E is also computed to smooth COVID-2020 outliers an
 
 ## Data Coverage
 
-Figure 1 shows the percentage of countries with available data for each key variable across years. GHG, GDP, and GHG per capita are complete throughout the panel. PM2.5 stands out as the most significant gap — data is entirely missing for 2021–2023 and sparsely available before 2000, which directly shapes the design of View 2 in the dashboard.
+Figure 1 shows the percentage of countries with available data for each key variable across years. GHG, GDP, and GHG per capita are complete throughout the panel. PM2.5 stands out as the most significant gap — data is entirely missing for 2021–2023 and sparsely available before 2000, which directly shapes the design of the Air Quality layer in the dashboard.
 
 ![Data coverage heatmap across variables and years.](figures/fig1_missing_values.png){width=100%}
 
@@ -285,7 +288,7 @@ Figure 3 compares GDP per capita against GHG emissions per capita in 2000 and 20
 
 ## PM2.5 Air Quality Trends
 
-Figure 4 shows PM2.5 exposure trends for a selection of countries. Western nations (Germany, USA, Japan) show consistent decline toward but still above the WHO guideline of 5 $\mu$g/m$^3$. China shows a declining trend after peaking around 2006. India remains persistently high. The data gap after 2020 is clearly marked and is acknowledged as a limitation in View 2 of the dashboard.
+Figure 4 shows PM2.5 exposure trends for a selection of countries. Western nations (Germany, USA, Japan) show consistent decline toward but still above the WHO guideline of 5 $\mu$g/m$^3$. China shows a declining trend after peaking around 2006. India remains persistently high. The data gap after 2020 is clearly marked and is acknowledged as a limitation in the Air Quality layer of the dashboard.
 
 ![PM2.5 mean population exposure over time for selected countries.](figures/fig4_pm25_timeseries.png){width=100%}
 

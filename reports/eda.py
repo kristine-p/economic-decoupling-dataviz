@@ -23,14 +23,14 @@ df = pd.read_csv(DATA_PATH)
 
 # Color palette matching the dashboard
 TAPIO_COLORS = {
-    "absolute_decoupling":           "#2D5A27",
-    "relative_decoupling":           "#A8C5A0",
+    "absolute_decoupling":           "#3FA843",
+    "relative_decoupling":           "#9ECB92",
     "expansive_coupling":            "#E8A87C",
-    "expansive_negative_decoupling": "#C4623A",
-    "recessive_decoupling":          "#8FAF8F",
-    "recessive_coupling":            "#C4B49A",
-    "strong_negative_decoupling":    "#A07060",
-    "undefined":                     "#D9D9D9",
+    "expansive_negative_decoupling": "#D2603E",
+    "recessive_decoupling":          "#7FAE8A",
+    "recessive_coupling":            "#C7B18F",
+    "strong_negative_decoupling":    "#B0715A",
+    "undefined":                     "#C7CCD0",
 }
 
 TAPIO_LABELS = {
