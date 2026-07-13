@@ -52,6 +52,8 @@ st.session_state.setdefault("active_view", "Decoupling Map")
 @st.dialog("About This Dashboard", width="large")
 def show_info_dialog():
     st.markdown(f"""
+### Demo Video
+https://www.youtube.com/watch?v=h6miKoq9yLs
 ### Key Terms
 
 | Abbreviation | Meaning |
